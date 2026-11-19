@@ -269,22 +269,6 @@ function paint(g) {
   }
   g.globalAlpha = 1;
 }
-function toSVG(v = viewOf('story')) {
-  const n = v => Math.round(v * 10) / 10, esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const parts = [];
-  for (const o of OPS) {
-    const op = o.a < 1 ? ` opacity="${n(o.a)}"` : '';
-    if (o.k === 'bg') parts.push(`<rect x="-6000" y="-6000" width="14000" height="14000" fill="${o.fill}"${op}/>`);
-    else if (o.k === 'p') {
-      const d = cmds(o.pts, o.closed, o.sharp).map(c => c[0] + c.slice(1).map(n).join(' ')).join('');
-      parts.push(`<path d="${d}" fill="${o.fill || 'none'}"${o.stroke && o.lw > 0 ? ` stroke="${o.stroke}" stroke-width="${n(o.lw)}"` : ''}${op}/>`);
-    } else {
-      parts.push(`<text transform="matrix(${o.m.map(v => Math.round(v * 1000) / 1000).join(' ')})" font-size="${n(o.size)}" fill="${o.fill}"${o.stroke ? ` stroke="${o.stroke}" stroke-width="${n(o.lw)}" paint-order="stroke"` : ''}${op}>${esc(o.ch)}</text>`);
-    }
-  }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${v.w}" height="${v.h}" viewBox="0 0 ${v.w} ${v.h}"><defs><style>@import url('https://fonts.googleapis.com/css2?family=Shantell+Sans:wght@800&amp;display=swap');text{font-family:'Shantell Sans','Comic Sans MS',cursive;font-weight:800;text-anchor:middle}path{stroke-linecap:round;stroke-linejoin:round}</style></defs><g transform="matrix(${v.k} 0 0 ${v.k} ${v.ox} ${v.oy})">${parts.join('')}</g></svg>`;
-}
-
 // ───────── state ─────────
 const S = { name: '', births: [], msg: 0, th: 'retro', scene: 'bed', shape: 'story', phase: 'type', goT: 0, ended: false };
 const MX = document.createElement('canvas').getContext('2d');
@@ -802,7 +786,7 @@ function buildPanel() {
 function syncURL() { if (S.phase === 'story') { try { history.replaceState(null, '', shareURL(true)); } catch (e) {} } }
 // one menu for both "save" and "share": pick a shape, see it, pick a format
 function mediaSheet(mode) {
-  const kinds = mode === 'save' ? ['video', 'jpg', 'png', 'svg'] : ['video', 'jpg', 'png', 'link'];
+  const kinds = mode === 'save' ? ['video', 'gif', 'jpg'] : ['video', 'gif', 'jpg', 'link'];
   openSheet('<h3>shape</h3><div class="grid">' + Object.entries(SHAPES).map(([k, v]) => `<button type="button" class="hd sm${k === S.shape ? ' on' : ''}" data-shape="${k}">${v.label}</button>`).join('') +
     `</div><canvas id="pv"></canvas><h3>${mode} as</h3><div class="grid">` + kinds.map((k, i) => `<button type="button" class="hd" data-s="${k}">${k}</button>`).join('') + '</div><div id="status"></div>');
   sheet.querySelectorAll('[data-shape]').forEach(b => b.onclick = () => { if (BUSY) return; S.shape = b.dataset.shape; mediaSheet(mode); });
@@ -827,13 +811,16 @@ const fileName = () => fname() + (S.shape === 'story' ? '' : '-' + S.shape);
 const lock = on => { BUSY = on; sheet.querySelectorAll('[data-s],[data-shape]').forEach(b => b.disabled = on); };
 // makes the picture or video in the chosen shape; null if the video could not be made
 async function makeFile(kind) {
-  const v = viewOf(S.shape);
-  if (kind === 'png') return { blob: await stillBlob('image/png', S.shape), ext: 'png' };
   if (kind === 'jpg') return { blob: await stillBlob('image/jpeg', S.shape), ext: 'jpg' };
-  if (kind === 'svg') { render({ st: STILL, time: STILL, live: false, view: v }); return { blob: new Blob([toSVG(v)], { type: 'image/svg+xml' }), ext: 'svg' }; }
+  if (kind === 'gif') {
+    lock(true);
+    try { return await makeGif(p => status(`drawing the gif… ${Math.round(p * 100)}%`), S.shape); }
+    catch (e) { console.error(e); status('gif didn’t work in this browser — try video or jpg'); return null; }
+    finally { lock(false); }
+  }
   lock(true);
   try { return await makeVideo(p => status(`drawing the video… ${Math.round(p * 100)}%`), S.shape); }
-  catch (e) { console.error(e); status('video didn’t work in this browser — try Chrome, or use png'); return null; }
+  catch (e) { console.error(e); status('video didn’t work in this browser — try Chrome, or use gif'); return null; }
   finally { lock(false); }
 }
 async function saveAs(kind) {
@@ -858,13 +845,47 @@ async function shareAs(kind) {
     return;
   }
   const send = async () => { try { await navigator.share({ files: [file], text: caption }); status(''); } catch (e) { if (e.name !== 'AbortError') { dl(r.blob, file.name); status('sharing didn’t open, so it was saved instead'); } } };
-  if (kind !== 'video') return send();
-  // the share menu opens by itself as soon as the video is drawn; only a browser that insists on a fresh tap gets a button to tap
+  if (kind === 'jpg') return send();
+  // the share menu opens by itself as soon as the video or gif is drawn; only a browser that insists on a fresh tap gets a button to tap
   try { await navigator.share({ files: [file], text: caption }); status(''); }
   catch (e) {
     if (e.name === 'AbortError') { status(''); return; }
     const st = $('status'); st.innerHTML = '<button type="button" class="hd" id="sendIt">ready, tap to share</button>'; $('sendIt').onclick = send;
   }
+}
+// the gif encoder is only fetched when someone asks for a gif, and only run if it is exactly the file we expect
+const GIF_LIB = 'https://cdn.jsdelivr.net/npm/gifenc@1.0.3/dist/gifenc.esm.js', GIF_SHA = 'P7/5O5/b1yQQnqgcqktjBKyP5irxx5L0p6ft3eD1i3ASjVm03RkbLOmZkKr6qFHb';
+let gifLib = null;
+async function loadGif() {
+  if (gifLib) return gifLib;
+  const buf = await (await fetch(GIF_LIB)).arrayBuffer(), sum = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-384', buf))));
+  if (sum !== GIF_SHA) throw new Error('gif library changed');
+  const u = URL.createObjectURL(new Blob([buf], { type: 'text/javascript' }));
+  try { gifLib = await import(u); } finally { URL.revokeObjectURL(u); }
+  return gifLib;
+}
+// the same loop as the video, at half the size and 10 pictures a second, so it stays small enough to send
+const GFPS = 10;
+async function makeGif(progress, key = 'story') {
+  progress(0);
+  const { GIFEncoder, quantize, applyPalette } = await loadGif();
+  const v = viewOf(key), z = .5, w = Math.round(v.w * z), h = Math.round(v.h * z), c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d', { willReadFrequently: true }), N = Math.round(VDUR * GFPS);
+  const draw = i => {
+    const tv = i / GFPS, dip = Math.max(1 - seg(tv, 0, .3), seg(tv, VDUR - .3, VDUR));
+    render({ st: tv - LEAD, time: tv, live: false, dip, clean: true, view: v }); g.setTransform(v.k * z, 0, 0, v.k * z, v.ox * z, v.oy * z); paint(g);
+    return g.getImageData(0, 0, w, h).data;
+  };
+  // one set of colours for the whole clip, taken from pictures spread across the story
+  const pick = [0, .08, .2, .35, .5, .65, .8, .95].map(k => Math.floor(k * (N - 1))), all = new Uint8ClampedArray(pick.length * w * h * 4);
+  pick.forEach((i, j) => all.set(draw(i), j * w * h * 4));
+  const pal = quantize(all, 256, { format: 'rgb565' }), enc = GIFEncoder();
+  for (let i = 0; i < N; i++) {
+    enc.writeFrame(applyPalette(draw(i), pal, 'rgb565'), w, h, { palette: i ? undefined : pal, delay: 1000 / GFPS, repeat: 0 });
+    if (i % 3 === 0) { progress(i / N); await new Promise(r => setTimeout(r, 0)); }
+  }
+  enc.finish();
+  return { blob: new Blob([enc.bytes()], { type: 'image/gif' }), ext: 'gif' };
 }
 // the whole story as one loop: 1s at the desk → story → hold → dip back to the start
 const FPS = 30, LEAD = 1, VDUR = LEAD + END + 2.2;
