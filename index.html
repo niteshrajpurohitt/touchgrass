@@ -13,6 +13,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://touchgrass.niteshrajpurohit.in/og.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect x=%223%22 y=%223%22 width=%2258%22 height=%2258%22 rx=%2215%22 fill=%22%23F2EAD3%22 stroke=%22%2323395B%22 stroke-width=%224%22/%3E%3Cpath d=%22M15 53C15 47 13 42 8 38C15 40 20 46 20 53Z%22 fill=%22%237DB862%22 stroke=%22%2323395B%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M39 53C40 43 45 35 55 30C49 37 46 45 45 53Z%22 fill=%22%237DB862%22 stroke=%22%2323395B%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M21 53C21 41 18 30 10 21C20 26 28 39 29 53Z%22 fill=%22%237DB862%22 stroke=%22%2323395B%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M28 53C27 37 30 21 43 9C38 24 37 38 36 53Z%22 fill=%22%237DB862%22 stroke=%22%2323395B%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M10 54H54%22 fill=%22none%22 stroke=%22%2323395B%22 stroke-width=%223.6%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shantell+Sans:wght@500..800&display=swap" rel="stylesheet">
@@ -74,7 +75,7 @@ html,body{margin:0;height:100%;background:var(--page);overflow:hidden;overscroll
 </head>
 <body>
 <div id="stage">
-  <canvas id="cv"></canvas>
+  <canvas id="cv" role="img" aria-label="A hand-drawn person leaves their screen, walks outside, sits in the grass and smells a flower."></canvas>
   <div id="top" class="bar">
     <div class="brand">touchgrass</div>
   </div>
@@ -99,7 +100,7 @@ html,body{margin:0;height:100%;background:var(--page);overflow:hidden;overscroll
 <!-- visitor counts (Vercel Web Analytics) -->
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
 <script defer src="/_vercel/insights/script.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.min.js" integrity="sha384-ut5hA6QX8px1vwvHCiy1MqfODbif8Iy0Gr+X61/AoNxP3VXx2wF99Pu9PeTEkG5E" crossorigin="anonymous" defer></script>
 <script>
 (() => {
 'use strict';
@@ -716,11 +717,11 @@ function frame() {
 
 // ───────── controls ─────────
 const nameEl = $('name'), typeBar = $('typeBar'), doneBar = $('doneBar'), sheet = $('sheet'), scrim = $('scrim');
-function setTheme(k) {
+function setTheme(k, keep = true) {
   if (!THEMES[k]) k = 'retro'; S.th = k; T = THEMES[k];
   const r = document.documentElement.style;
   r.setProperty('--ink', T.ui || T.ink); r.setProperty('--paper', T.paper); r.setProperty('--accent', T.accent); r.setProperty('--page', T.page);
-  try { localStorage.setItem('tg-theme', k); } catch (e) {}
+  if (keep) try { localStorage.setItem('tg-theme', k); } catch (e) {}
 }
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); }
 nameEl.addEventListener('input', () => {
@@ -913,17 +914,16 @@ let th = q.get('th'), m = q.get('m'), sc = q.get('s'), who = q.get('c');
 // a shared link shows exactly what the sender picked; otherwise use what this visitor picked last time
 if (!q.has('n')) try { th = th || localStorage.getItem('tg-theme'); if (m == null) m = localStorage.getItem('tg-msg'); sc = sc || localStorage.getItem('tg-scene'); who = who || localStorage.getItem('tg-who'); } catch (e) {}
 S.scene = sc === 'desk' ? 'desk' : 'bed'; S.who = who === 'b' ? 'b' : 'a';
-setTheme(th || 'retro'); S.msg = cl(parseInt(m) || 0, 0, MSGS.length - 1); buildPanel(); layout();
+setTheme(th || 'retro', !q.has('n')); S.msg = cl(parseInt(m) || 0, 0, MSGS.length - 1); buildPanel(); layout();
 if (q.has('t')) FREEZE = parseFloat(q.get('t'));             // ?t=5 freezes the story at 5s (for checking)
 if (q.has('ui')) document.querySelectorAll('.bar,#panel').forEach(b => b.classList.add('hidden'));
 const n0 = (q.get('n') || '').trim().slice(0, 16);
-if (n0) {        // opened from a shared link: a short note first, then the story plays for that name
+if (n0) {        // opened from a shared link: a moment on the opening picture, then the story plays for that name
   nameEl.value = n0; S.name = n0; S.births = [...n0].map(() => -9);
   if (FREEZE == null) { S.fromLink = true; S.intro = true; $('sceneBar').classList.add('hidden'); setTimeout(go, 1000); }
 }
 else if (!TOUCH) setTimeout(() => nameEl.focus({ preventScroll: true }), 80);
 if (document.fonts && document.fonts.load) document.fonts.load(`800 100px ${FONT}`).catch(() => {});
-window.__tg = { render, paint, toSVG, makeVideo, S };
 frame();
 })();
 </script>
