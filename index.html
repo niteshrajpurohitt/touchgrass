@@ -4,11 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>touchgrass</title>
-<meta name="description" content="Type a name. Send them outside.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://touchgrass.niteshrajpurohit.in/">
-<meta property="og:title" content="touchgrass">
-<meta property="og:description" content="Type a name. Send them outside.">
+<meta property="og:title" content="touchgrass · tell a friend to go outside">
 <meta property="og:image" content="https://touchgrass.niteshrajpurohit.in/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -670,7 +668,7 @@ function render(o) {
   butterfly(st, time);
   restore();
   words(o);
-  if (o.view) label(SITE, 540, VIEW.bot - 34, 30, .6);     // saved pictures and videos carry the address, so people know where to make one
+  if (o.view) { MX.font = `800 26px ${FONT}`; label(SITE, VIS[1] - 20 - MX.measureText(SITE).width / 2, VIEW.bot - 16, 26, .38); }     // saved pictures and videos carry the address, so people know where to make one
   if (o.dip > 0) OPS.push({ k: 'bg', fill: T.sky, a: o.dip });
 }
 
@@ -846,14 +844,15 @@ async function shareAs(kind) {
   }
   const r = await makeFile(kind); if (!r) return;
   const file = new File([r.blob], fileName() + '.' + r.ext, { type: r.blob.type });
+  const caption = `${text} make yours: ${SITE}`;      // a picture or video already shows the story, so the caption points to the plain site
   if (!(navigator.canShare && navigator.canShare({ files: [file] }))) {      // e.g. most desktop browsers: save the file and hand over the link instead
     dl(r.blob, file.name); status((await copyLink(url)) ? 'this browser can’t share files, so it was saved and the link was copied' : 'this browser can’t share files, so it was saved instead');
     return;
   }
-  const send = async () => { try { await navigator.share({ files: [file], text: text + ' ' + url }); status(''); } catch (e) { if (e.name !== 'AbortError') { dl(r.blob, file.name); status('sharing didn’t open, so it was saved instead'); } } };
+  const send = async () => { try { await navigator.share({ files: [file], text: caption }); status(''); } catch (e) { if (e.name !== 'AbortError') { dl(r.blob, file.name); status('sharing didn’t open, so it was saved instead'); } } };
   if (kind !== 'video') return send();
   // the share menu opens by itself as soon as the video is drawn; only a browser that insists on a fresh tap gets a button to tap
-  try { await navigator.share({ files: [file], text: text + ' ' + url }); status(''); }
+  try { await navigator.share({ files: [file], text: caption }); status(''); }
   catch (e) {
     if (e.name === 'AbortError') { status(''); return; }
     const st = $('status'); st.innerHTML = '<button type="button" class="hd" id="sendIt">ready, tap to share</button>'; $('sendIt').onclick = send;
