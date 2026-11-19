@@ -86,21 +86,24 @@ html,body{margin:0;height:100%;background:var(--page);overflow:hidden;overscroll
 const W = 1080, H = 1920, G = 1450, LW = 7, D = Math.PI / 180;
 const FONT = '"Shantell Sans","Comic Sans MS",cursive';
 const MSGS = ['touch grass', 'go outside', 'log off'];
+const TOUCH = matchMedia('(pointer:coarse)').matches;      // a phone or tablet: wording says tap and go instead of type and enter
+const SITE = location.hostname && !/^(localhost|127\.)/.test(location.hostname) ? location.hostname : 'touchgrass.niteshrajpurohit.in';
 const END = 7.6;      // story length after "go", seconds
 const STILL = 9;      // story time used for still images
 const THEMES = {
   retro: { label: 'retro', page: '#E2D8BD', sky: '#F2EAD3', indoor: '#DCCFAE', floor: '#C9B98F', ink: '#23395B', paper: '#FFF9EA', skin: '#F4C7A1', hair: '#23395B',
     top: '#E4572E', pants: '#4C8C8A', shoe: '#F3A712', prop: '#FFF9EA', prop2: '#A8C6A0', screen: '#A8E0D6', ground: '#8FBF73', hill: '#BFD8A0', grass: '#6FA85B',
     flower: '#E4572E', flower2: '#F3A712', center: '#F3A712', sun: '#F3A712', cloud: '#FFF9EA', accent: '#F3A712', text: '#23395B' },
+  night: { label: 'night', page: '#0B1020', sky: '#16224A', indoor: '#111A36', floor: '#1B2748', ink: '#060A16', paper: '#1B2748', skin: '#F2C6A0', hair: '#34507A',
+    top: '#F2B441', pants: '#4A7FA5', shoe: '#F27D62', prop: '#2A3A66', prop2: '#3B6690', screen: '#8DE8FF', ground: '#236650', hill: '#1B4C42', grass: '#35996A',
+    flower: '#FF9E8A', flower2: '#FFE08A', center: '#FFF6DC', sun: '#FFF1B8', cloud: '#2C3F6E', accent: '#FFD45E', text: '#F4EEDC', win: '#22356B',
+    line: '#D8CFB8', ui: '#F4EEDC', ghost: .4, stars: true, moon: true },   // line: colour of strokes that stand alone (stems, clock hands); ui: button text and borders
   ink: { label: 'ink', page: '#E6E6EF', sky: '#F5F5F8', indoor: '#DADBF1', floor: '#C6C8EC', ink: '#2B2FD0', paper: '#FFFFFF', skin: '#FFD7C2', hair: '#2B2FD0',
     top: '#C9F24B', pants: '#8E7CF5', shoe: '#FF6B5E', prop: '#FFFFFF', prop2: '#8E7CF5', screen: '#9EE7FF', ground: '#C9F24B', hill: '#E4F8B0', grass: '#A6E22E',
     flower: '#FF6B5E', flower2: '#FFB8F0', center: '#FFD84D', sun: '#FFD84D', cloud: '#FFFFFF', accent: '#C9F24B', text: '#2B2FD0' },
   sunset: { label: 'sunset', page: '#F4CDB2', sky: '#FFE6D0', indoor: '#E7C2B4', floor: '#D6A793', ink: '#4A1838', paper: '#FFF6EE', skin: '#FFD2B8', hair: '#4A1838',
     top: '#FF7A59', pants: '#8A5A9E', shoe: '#FFD166', prop: '#FFF6EE', prop2: '#FFB199', screen: '#FFE9A8', ground: '#9BCB6B', hill: '#C9DE9A', grass: '#7DB356',
     flower: '#FF5C8A', flower2: '#FFD166', center: '#FFD166', sun: '#FF9F5A', cloud: '#FFF6EE', accent: '#FF7A59', text: '#4A1838' },
-  night: { label: 'night', page: '#0C0E2A', sky: '#1A1D4A', indoor: '#111335', floor: '#1E2152', ink: '#F1EEFF', paper: '#272B66', skin: '#F5C9B0', hair: '#4A4FB0',
-    top: '#7C6CF2', pants: '#3B3F8F', shoe: '#FF8A7A', prop: '#272B66', prop2: '#3B3F8F', screen: '#7CF0FF', ground: '#2F6B4F', hill: '#244A45', grass: '#3E8F63',
-    flower: '#FFB8F0', flower2: '#FFE27A', center: '#FFE27A', sun: '#FFF1B8', cloud: '#2E3270', accent: '#FFE27A', text: '#F1EEFF', stars: true, moon: true },
   pencil: { label: 'pencil', page: '#E6E1D5', sky: '#FAF7F0', indoor: '#E7E2D5', floor: '#D8D2C2', ink: '#1F1F1F', paper: '#FFFFFF', skin: '#FAF7F0', hair: '#1F1F1F',
     top: '#FAF7F0', pants: '#D6D0C0', shoe: '#1F1F1F', prop: '#FAF7F0', prop2: '#D6D0C0', screen: '#FFFFFF', ground: '#EFEADC', hill: '#F5F1E6', grass: '#E2DCC9',
     flower: '#FAF7F0', flower2: '#D6D0C0', center: '#1F1F1F', sun: '#FAF7F0', cloud: '#FFFFFF', accent: '#FFFFFF', text: '#1F1F1F' }
@@ -164,7 +167,8 @@ function shape(pts, key, fill, o = {}) {
 // open line
 function line(pts, key, color, lw = LW, o = {}) {
   const q = wob(pts, key, o.amp ?? 2); if (!seen(q)) return;
-  OPS.push({ k: 'p', pts: q, closed: false, sharp: !!o.sharp, fill: null, stroke: color || T.ink, lw: lw * tsc(), a: ALPHA * (o.a ?? 1) });
+  const col = !o.raw && T.line && (color || T.ink) === T.ink ? T.line : color || T.ink;     // o.raw keeps the outline colour (used for the face)
+  OPS.push({ k: 'p', pts: q, closed: false, sharp: !!o.sharp, fill: null, stroke: col, lw: lw * tsc(), a: ALPHA * (o.a ?? 1) });
 }
 // outlined tube (arms, legs)
 function tube(pts, key, w, fill) {
@@ -187,6 +191,13 @@ function ell(cx, cy, rx, ry, n, rot = 0) {
   const out = [], cs = Math.cos(rot), sn = Math.sin(rot);
   for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, x = Math.cos(a) * rx, y = Math.sin(a) * ry; out.push([cx + x * cs - y * sn, cy + x * sn + y * cs]); }
   return out;
+}
+// crescent moon: outer edge round the left, a shallower inner edge back, tilted a little
+function crescent(cx, cy, R, tilt = -.45) {
+  const P = [], cs = Math.cos(tilt), sn = Math.sin(tilt), put = (x, y) => P.push([cx + x * cs - y * sn, cy + x * sn + y * cs]);
+  for (let t = 300; t >= 60; t -= 20) put(Math.cos(t * D) * R, Math.sin(t * D) * R);
+  for (let t = 125; t <= 235; t += 22) put(.75 * R + Math.cos(t * D) * .9 * R, Math.sin(t * D) * .9 * R);
+  return P;
 }
 function puff(cx, cy, rx, ry, bumps = 7, flat = true) {
   const out = [], n = bumps * 4;
@@ -256,7 +267,11 @@ const MX = document.createElement('canvas').getContext('2d');
 
 // ───────── the person ─────────
 const TL = 170, NECK = 12, HR = 56, TH = 120, SHN = 117, UA = 96, FA = 92, LEGW = 40, ARMW = 32;
-const SIT = { x: 330, y: 1318, torso: 12, head: 8, lt: 88, ls: -2, rt: 92, rs: 2, lu: 50, lf: 112, ru: 55, rf: 115 };
+const SIT = { x: 345, y: 1318, torso: 20, head: 6, lt: 88, ls: -2, rt: 92, rs: 2, lu: 50, lf: 112, ru: 55, rf: 115 };
+{ // put both hands on the laptop keyboard: work the arm angles out from where the keys are
+  const sh = add([SIT.x, SIT.y], upv(SIT.torso), TL - 20);
+  [SIT.ru, SIT.rf] = ik(sh, [574, 1160], UA, FA); [SIT.lu, SIT.lf] = ik(sh, [550, 1160], UA, FA);
+}
 const UPSIT = { ...SIT, torso: -3, head: -12, ru: 40, rf: 132, lu: 36, lf: 128 };
 const STAND = { x: 345, y: 1202, torso: 0, head: 0, lt: -3, ls: -3, rt: 3, rs: 3, lu: -6, lf: -2, ru: 8, rf: 16 };
 const SITG = { x: 462, y: 1457, torso: 4, head: -4, lt: 118, ls: 62, rt: 125, rs: 55, lu: 2, lf: 91, ru: 24, rf: 70 };   // low enough that the front grass hides where the body meets the ground
@@ -266,7 +281,7 @@ const PICK = [665, 1405];   // where the hand grabs the flower
 function poseAt(st, time) {
   let P, mood = 'tired', rk = 0, uk = 0;
   if (st < 0) {
-    P = { ...SIT }; P.rf += 5 * Math.sin(time * 19); P.lf += 5 * Math.sin(time * 19 + 2.1); P.head += 1.5 * Math.sin(time * 1.3);
+    P = { ...SIT }; P.rf += 2 + 3 * Math.sin(time * 19); P.lf += 2 + 3 * Math.sin(time * 19 + 2.1); P.head += 1.5 * Math.sin(time * 1.3);
   } else if (st < .3) { P = lp(SIT, UPSIT, eout(seg(st, 0, .3))); mood = 'wide'; }
   else if (st < .95) { const k = eio(seg(st, .3, .95)); P = lp(UPSIT, STAND, k); P.torso += Math.sin(k * Math.PI) * 24; mood = 'wide'; }
   else if (st < 1.2) { P = { ...STAND }; mood = 'wide'; }
@@ -319,10 +334,10 @@ function person(pp, time) {
   shape(ell(0, 0, HR, HR, 18), 'head', T.skin);
   shape([[-53, 14], [-59, -14], [-45, -48], [-11, -63], [25, -57], [50, -34], [31, -25], [14, -34], [-3, -24], [-22, -17], [-31, 6], [-42, 17]], 'hair', T.hair);
   shape(ell(-8, 8, 10, 13, 9), 'ear', T.skin, { lw: 5 });
-  if (mood === 'tired') { line([[16, -6], [26, -2], [36, -6]], 'eye', T.ink, 6); line([[18, 7], [26, 10], [34, 7]], 'bag', T.ink, 4, { a: .55 }); line([[22, 29], [40, 28]], 'mouth', T.ink, 5); }
-  else if (mood === 'wide') { shape(ell(26, -8, 8, 10, 9), 'eye', T.ink, { stroke: null }); line([[14, -29], [36, -32]], 'brow', T.ink, 5); shape(ell(33, 28, 6, 8, 8), 'mouth', T.ink, { stroke: null }); }
-  else if (mood === 'open') { shape(ell(26, -6, 6.5, 7.5, 9), 'eye', T.ink, { stroke: null }); line([[20, 24], [30, 30], [42, 24]], 'mouth', T.ink, 5); }
-  else { line([[16, -2], [26, -11], [36, -2]], 'eye', T.ink, 6); line([[16, 20], [30, 34], [46, 20]], 'mouth', T.ink, 5); shape(ell(12, 17, 11, 7, 8), 'blush', T.flower, { stroke: null, a: .45 }); }
+  if (mood === 'tired') { line([[16, -6], [26, -2], [36, -6]], 'eye', T.ink, 6, { raw: true }); line([[18, 7], [26, 10], [34, 7]], 'bag', T.ink, 4, { a: .55, raw: true }); line([[22, 29], [40, 28]], 'mouth', T.ink, 5, { raw: true }); }
+  else if (mood === 'wide') { shape(ell(26, -8, 8, 10, 9), 'eye', T.ink, { stroke: null }); line([[14, -29], [36, -32]], 'brow', T.ink, 5, { raw: true }); shape(ell(33, 28, 6, 8, 8), 'mouth', T.ink, { stroke: null }); }
+  else if (mood === 'open') { shape(ell(26, -6, 6.5, 7.5, 9), 'eye', T.ink, { stroke: null }); line([[20, 24], [30, 30], [42, 24]], 'mouth', T.ink, 5, { raw: true }); }
+  else { line([[16, -2], [26, -11], [36, -2]], 'eye', T.ink, 6, { raw: true }); line([[16, 20], [30, 34], [46, 20]], 'mouth', T.ink, 5, { raw: true }); shape(ell(12, 17, 11, 7, 8), 'blush', T.flower, { stroke: null, a: .45 }); }
   restore();
   // near arm (may reach for the flower)
   let na = arm(P.ru, P.rf);
@@ -361,8 +376,7 @@ function sky(st, time, out) {
   if (sk > 0) {
     const sx = VIEW.sun[0], sy = lerp(1560, VIEW.sun[1], sk);
     if (!T.moon) for (let i = 0; i < 10; i++) { const a = i * 36 * D + time * .25; line([[sx + Math.cos(a) * 96, sy + Math.sin(a) * 96], [sx + Math.cos(a) * 128, sy + Math.sin(a) * 128]], 'ray' + i, T.ink, 7); }
-    shape(ell(sx, sy, 72, 72, 18), 'sun', T.sun);
-    if (T.moon) { shape(ell(sx - 22, sy - 14, 14, 12, 8), 'cr1', null, { lw: 4 }); shape(ell(sx + 24, sy + 20, 10, 9, 8), 'cr2', null, { lw: 4 }); }
+    if (T.moon) shape(crescent(sx, sy, 84), 'sun', T.sun); else shape(ell(sx, sy, 72, 72, 18), 'sun', T.sun);
   }
   CLOUDS.forEach((c, i) => {
     const k = eout(seg(st, 1.6 + i % 3 * .25, 2.9 + i % 3 * .25)); if (k <= 0) return;
@@ -377,8 +391,8 @@ function wall(st) {
   if (wk < 1) {
     save(); translate(0, -wk * 1500);
     shape(rect(110, 800, 220, 240), 'win', T.prop);
-    shape(rect(130, 820, 180, 200), 'winin', mix(T.ink, T.indoor, .3), { lw: 5 });
-    shape(ell(268, 866, 17, 17, 9), 'winmoon', T.center, { lw: 4 });
+    shape(rect(130, 820, 180, 200), 'winin', T.win || mix(T.ink, T.indoor, .3), { lw: 5 });
+    shape(crescent(266, 868, 24), 'winmoon', T.moon ? T.sun : T.center, { lw: 4 });   // it is night outside the window in every theme
     line([[220, 822], [220, 1018]], 'winv', T.ink, 6); line([[132, 920], [308, 920]], 'winh', T.ink, 6);
     restore();
   }
@@ -449,11 +463,11 @@ function sides(st) {
 function chair(st) {
   const k = inback(seg(st, .75, 1.35)); if (seg(st, .75, 1.35) >= 1) return;
   save(); translate(325 - k * 760, 1350); rotate(-k * .5); translate(-325, -1350);
-  line([[262, 1300], [262, 1352]], 'cbar', T.ink, 12);
+  line([[262, 1300], [262, 1352]], 'cbar', T.ink, 12, { raw: true });
   shape(rect(214, 1108, 42, 206), 'cback', T.prop2);
   shape(rect(238, 1340, 176, 28), 'cseat', T.prop2);
   shape(rect(318, 1368, 16, 52), 'cpost', T.prop, { lw: 5 });
-  line([[252, 1424], [326, 1416], [400, 1424]], 'cbase', T.ink, 10);
+  line([[252, 1424], [326, 1416], [400, 1424]], 'cbase', T.ink, 10, { raw: true });
   shape(ell(256, 1437, 11, 11, 8), 'cw1', T.prop, { lw: 5 }); shape(ell(396, 1437, 11, 11, 8), 'cw2', T.prop, { lw: 5 });
   restore();
 }
@@ -496,23 +510,63 @@ function letters(str, cx, base, size, style, pop) {
   }
   return x0 + w;
 }
+// a plain line of text, centred on x
+function label(str, x, y, size, a = 1, fill = T.text) { save(); alpha(a); translate(x, y); OPS.push({ k: 't', ch: str, m: TF.slice(), size, fill, stroke: null, lw: 0, a: ALPHA }); restore(); }
+// the name spot on the first screen: "type a name" and example names take turns typing themselves, until you type your own
+const ASK = TOUCH ? 'tap to type' : 'type a name';
+const PLACE = ['Rahul', 'my boss', 'that one friend', 'my ex', 'me'].flatMap(e => [ASK, e]);
+const placeDur = e => e.length * .13 + (e === ASK ? 2.4 : 1.3) + .3;
+function example(time) {
+  let t = time % PLACE.reduce((a, e) => a + placeDur(e), 0);
+  for (const e of PLACE) {
+    const ty = e.length * .09, hold = placeDur(e) - e.length * .13 - .3;
+    if (t < placeDur(e)) return { full: e, n: t < ty ? Math.floor(t / .09) + 1 : t < ty + hold ? e.length : Math.max(0, e.length - Math.floor((t - ty - hold) / .04) - 1) };
+    t -= placeDur(e);
+  }
+  return { full: PLACE[0], n: 0 };
+}
+// the blank line the name is written on, and the drawn key that starts the story (it can be tapped too)
+const BLANK = 822, KEY = { x: 540, y: BLANK + 84, w: 240, h: 80 };
+function enterKey(time) {
+  save(); translate(KEY.x, KEY.y); scale(1 + .05 * Math.sin(time * 5.5));
+  shape(rect(-KEY.w / 2, -KEY.h / 2, KEY.w, KEY.h), 'key', T.accent);
+  if (TOUCH) { label('go', -26, 15, 46, 1, T.ink); line([[14, 2], [58, 2]], 'ka', T.ink, 7, { raw: true }); line([[44, -12], [58, 2], [44, 16]], 'kb', T.ink, 7, { raw: true, sharp: true }); }
+  else { label('enter', -30, 15, 46, 1, T.ink); line([[86, -16], [86, 6], [50, 6]], 'ka', T.ink, 7, { raw: true, sharp: true }); line([[62, -6], [50, 6], [62, 18]], 'kb', T.ink, 7, { raw: true, sharp: true }); }
+  restore();
+}
 function words(o) {
   const { st, time, live } = o, l1 = MSGS[S.msg] + ',', nm = S.name.trim(), s1 = 118;
-  MX.font = `800 200px ${FONT}`;
-  const s2 = Math.min(200, 200 * 930 / MX.measureText((nm || 'their name') + '.').width), b1 = 600, b2 = b1 + 30 + s2 * .86;
+  const fit = str => { MX.font = `800 200px ${FONT}`; return Math.min(200, 200 * 930 / MX.measureText(str + '.').width); };
+  const s2 = fit(nm || 'their name'), b1 = 600, b2 = b1 + 30 + s2 * .86;
   const nameStyle = { fill: T.accent, stroke: T.ink, lw: Math.max(8, s2 * .075) };
-  if (st < .5 && !o.clean) {          // the typed name on screen; left out of saved videos, where the words only arrive at the end
+  if (st < .5 && !o.clean) {          // the opening words; left out of saved videos, where the words only arrive at the end
+    // what is on screen before "go": the question (typing), the note to a friend who got a link, or just the name
+    const mode = o.intro || (st >= 0 && o.was === 'intro') ? 'intro' : live || (st >= 0 && o.was === 'type') ? 'type' : 'plain';
     const ex = seg(st, 0, .45);
     save(); alpha(1 - ex); translate(0, ein(ex) * 170);
-    save(); alpha(.22); letters(l1, 540, b1, s1, { fill: T.text }, () => 1); restore();
-    let cx = 540 - 40;
-    if (nm) cx = letters(live ? nm : nm + '.', 540, b2, s2, nameStyle, i => live ? seg(time - (S.births[i] ?? -9), 0, .32) : 1);
-    else if (live) { save(); alpha(.2); cx = letters('their name', 540, b2, s2, { fill: T.text }, () => 1) - MX.measureText('their name').width; restore(); }
-    if (live) {
-      const hint = nm ? (TOUCH ? 'then press go' : 'then press enter') : (TOUCH ? 'tap to type a name' : 'type a name, then press enter');
-      save(); alpha(.5); translate(540, b1 - 170); OPS.push({ k: 't', ch: hint, m: TF.slice(), size: 44, fill: T.text, stroke: null, lw: 0, a: ALPHA }); restore();
+    if (mode === 'intro') { label('someone thinks', 540, b1 - 122, 72); letters('you need to...', 540, b1, s1, { fill: T.text }, () => 1); }
+    else if (mode === 'type') {
+      // the question, then a blank line with the name being written on it (or a muted prompt typing itself), then the key to press
+      label('who needs to', 540, b1 - 122, 72);
+      letters(MSGS[S.msg] + '?', 540, b1, s1, { fill: T.text }, () => 1);
+      const nb = BLANK - 24; let cx, cs = s2;
+      if (nm) cx = letters(nm, 540, nb, s2, nameStyle, i => live ? seg(time - (S.births[i] ?? -9), 0, .32) : 1);
+      else {
+        const e = example(time), shown = e.full.slice(0, e.n); cs = 120;
+        MX.font = `800 ${cs}px ${FONT}`; const x0 = 540 - MX.measureText(e.full).width / 2, w = MX.measureText(shown).width;
+        if (shown) { save(); alpha(T.ghost ? .38 : .28); letters(shown, x0 + w / 2, nb, cs, { fill: T.text }, () => 1); restore(); }
+        cx = x0 + w;
+      }
+      if (live) {
+        MX.font = `800 ${s2}px ${FONT}`; const lw = nm ? Math.max(700, MX.measureText(nm).width + 90) : 700;
+        line([[540 - lw / 2, BLANK], [540 - lw / 6, BLANK + 3], [540 + lw / 6, BLANK - 2], [540 + lw / 2, BLANK]], 'blank', T.ink, 8);
+        if ((time * 1.6) % 1 < .6) line([[cx + 14, nb - cs * .74], [cx + 14, nb + cs * .04]], 'caret', T.ink, 9);
+        if (nm) enterKey(time);
+      }
+    } else {
+      save(); alpha(T.ghost || .22); letters(l1, 540, b1, s1, { fill: T.text }, () => 1); restore();
+      if (nm) letters(nm + '.', 540, b2, s2, nameStyle, () => 1);
     }
-    if (live && (time * 1.6) % 1 < .6) line([[cx + 14, b2 - s2 * .74], [cx + 14, b2 + s2 * .06]], 'caret', T.ink, 9);
     restore();
   }
   if (st > 5.3) {
@@ -540,11 +594,12 @@ function render(o) {
   desk(st, time);
   person(poseAt(st, time), time);
   const ga = (1 - seg(st, 0, .4)) * .32;             // laptop light on the face
-  if (ga > 0) shape([[690, 1172], [734, 1052], [440, 1040], [428, 1150]], 'cone', T.screen, { stroke: null, a: ga, sharp: true });
+  if (ga > 0) shape([[690, 1172], [734, 1052], [478, 1046], [468, 1150]], 'cone', T.screen, { stroke: null, a: ga, sharp: true });
   grass(st, time, 1);
   butterfly(st, time);
   restore();
   words(o);
+  if (o.view) label(SITE, 540, VIEW.bot - 34, 30, .6);     // saved pictures and videos carry the address, so people know where to make one
   if (o.dip > 0) OPS.push({ k: 'bg', fill: T.sky, a: o.dip });
 }
 
@@ -571,26 +626,25 @@ function frame() {
   if (BUSY) return;
   const now = performance.now() / 1000; let st, time = now, live = false;
   if (FREEZE != null) { st = FREEZE; time = FREEZE + 1; }
-  else if (S.phase === 'type') { st = -1; live = true; }
+  else if (S.phase === 'type') { st = -1; live = !S.intro; }
   else { st = now - S.goT; if (st > END && !S.ended) { S.ended = true; onEnd(); } }
-  render({ st, time, live, vis: V.vis });
+  render({ st, time, live, vis: V.vis, intro: S.intro, was: S.was });
   g2.setTransform(1, 0, 0, 1, 0, 0); g2.clearRect(0, 0, cv.width, cv.height);
   g2.setTransform(V.k * V.dpr, 0, 0, V.k * V.dpr, V.ox * V.dpr, V.oy * V.dpr);
   paint(g2);
 }
 
 // ───────── controls ─────────
-const TOUCH = matchMedia('(pointer:coarse)').matches;
 const nameEl = $('name'), typeBar = $('typeBar'), doneBar = $('doneBar'), sheet = $('sheet'), scrim = $('scrim');
 function setTheme(k) {
   if (!THEMES[k]) k = 'retro'; S.th = k; T = THEMES[k];
   const r = document.documentElement.style;
-  r.setProperty('--ink', T.ink); r.setProperty('--paper', T.paper); r.setProperty('--accent', T.accent); r.setProperty('--page', T.page);
+  r.setProperty('--ink', T.ui || T.ink); r.setProperty('--paper', T.paper); r.setProperty('--accent', T.accent); r.setProperty('--page', T.page);
   try { localStorage.setItem('tg-theme', k); } catch (e) {}
 }
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); }
 nameEl.addEventListener('input', () => {
-  if (S.phase !== 'type') { nameEl.value = S.name; return; }
+  if (S.phase !== 'type' || S.intro) { nameEl.value = S.name; return; }
   const v = nameEl.value.replace(/^\s+/, '').slice(0, 16), now = performance.now() / 1000, old = S.name;
   if (v !== nameEl.value) nameEl.value = v;
   S.births = [...v].map((ch, i) => (i < old.length && old[i] === ch ? S.births[i] : now));
@@ -598,19 +652,25 @@ nameEl.addEventListener('input', () => {
 });
 function go() {
   if (!S.name.trim()) { nameEl.focus({ preventScroll: true }); return; }
+  S.was = S.intro ? 'intro' : S.phase === 'type' ? 'type' : 'plain'; S.intro = false;     // which opening words should fall away
   S.phase = 'story'; S.goT = performance.now() / 1000; S.ended = false; nameEl.blur();
   doneBar.classList.add('hidden');
   try { history.replaceState(null, '', shareURL(true)); } catch (e) {}
 }
 typeBar.addEventListener('submit', e => { e.preventDefault(); go(); });      // Enter (or "go" on a phone keyboard) starts it
 // keep the keys going to the name: tap the picture, or just start typing
-const focusName = () => { if (S.phase === 'type' && sheet.classList.contains('hidden')) nameEl.focus({ preventScroll: true }); };
-cv.addEventListener('click', focusName);
+const focusName = () => { if (S.phase === 'type' && !S.intro && sheet.classList.contains('hidden')) nameEl.focus({ preventScroll: true }); };
+cv.addEventListener('click', e => {
+  // a tap on the drawn enter/go key starts the story; anywhere else just gives the keys to the name
+  const x = (e.clientX - V.ox) / V.k, y = (e.clientY - V.oy) / V.k;
+  if (S.phase === 'type' && !S.intro && S.name.trim() && Math.abs(x - KEY.x) < KEY.w / 2 + 14 && Math.abs(y - KEY.y) < KEY.h / 2 + 14) go(); else focusName();
+});
 addEventListener('keydown', e => { if (document.activeElement !== nameEl && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter')) focusName(); });
 function onEnd() { doneBar.classList.remove('hidden'); }
 $('again').onclick = go;
 $('edit').onclick = () => {
   S.phase = 'type'; doneBar.classList.add('hidden');
+  if (S.fromLink) { S.fromLink = false; S.name = ''; }      // a friend who got a link starts their own from a blank name
   const now = performance.now() / 1000; S.births = [...S.name].map(() => now - 9);
   try { history.replaceState(null, '', location.pathname); } catch (e) {}
   nameEl.value = S.name; nameEl.focus({ preventScroll: true }); nameEl.select();
@@ -749,7 +809,10 @@ setTheme(th || 'retro'); S.msg = cl(parseInt(m) || 0, 0, MSGS.length - 1); build
 if (q.has('t')) FREEZE = parseFloat(q.get('t'));             // ?t=5 freezes the story at 5s (for checking)
 if (q.has('ui')) document.querySelectorAll('.bar,#panel').forEach(b => b.classList.add('hidden'));
 const n0 = (q.get('n') || '').trim().slice(0, 16);
-if (n0) { nameEl.value = n0; S.name = n0; S.births = [...n0].map(() => -9); if (FREEZE == null) setTimeout(go, 900); }
+if (n0) {        // opened from a shared link: a short note first, then the story plays for that name
+  nameEl.value = n0; S.name = n0; S.births = [...n0].map(() => -9);
+  if (FREEZE == null) { S.fromLink = true; S.intro = true; setTimeout(go, 2200); }
+}
 else if (!TOUCH) setTimeout(() => nameEl.focus({ preventScroll: true }), 80);
 if (document.fonts && document.fonts.load) document.fonts.load(`800 100px ${FONT}`).catch(() => {});
 window.__tg = { render, paint, toSVG, makeVideo, S };
