@@ -32,6 +32,8 @@ html,body{margin:0;height:100%;background:var(--page);overflow:hidden;overscroll
 .by span,.by u{opacity:.55}
 .by u{text-decoration:none;border-bottom:1.5px dashed currentColor;padding-bottom:1px}
 .by:hover u{opacity:1}
+#snd{padding:6px 8px;border-width:2.5px;line-height:0}
+#snd svg{width:22px;height:22px;display:block}
 .hd{border:3px solid var(--ink);border-radius:255px 18px 225px 18px/18px 225px 18px 255px;background:var(--paper);color:var(--ink);
   font:inherit;font-weight:700;font-size:18px;line-height:1.1;padding:11px 16px;cursor:pointer;
   transition:transform .1s;touch-action:manipulation;white-space:nowrap}
@@ -82,6 +84,7 @@ html,body{margin:0;height:100%;background:var(--page);overflow:hidden;overscroll
   <canvas id="cv" role="img" aria-label="A hand-drawn person leaves their screen, walks outside, sits in the grass and smells a flower."></canvas>
   <div id="top" class="bar">
     <div><div class="brand">touchgrass</div><a class="by" href="https://x.com/niteshhh__" target="_blank" rel="noopener"><span>by </span><u>nitesh</u></a></div>
+    <button class="hd" id="snd" type="button" aria-pressed="false" aria-label="sound"></button>
   </div>
   <form id="typeBar" autocomplete="off">
     <input id="name" type="text" inputmode="text" maxlength="16" enterkeyhint="go" autocapitalize="words" autocorrect="off" spellcheck="false" aria-label="their name">
@@ -703,6 +706,88 @@ function frame() {
   paint(g2);
 }
 
+// ───────── sound ─────────
+// every sound is made here from plain tones and hiss (no audio files); off until the visitor turns it on
+const SND = { on: false, ctx: null, run: null };
+function tone(ac, out, t, f, d, v, type = 'sine', f2) {
+  const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + .006); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(g); g.connect(out); o.start(t); o.stop(t + d + .03);
+}
+const pluck = (ac, out, t, f, v = .2) => { tone(ac, out, t, f, 1.2, v); tone(ac, out, t, f * 2, .5, v * .2); tone(ac, out, t, f * 3.01, .22, v * .07); };   // a soft thumb-piano note
+function hissBuf(ac) {
+  if (ac._hiss) return ac._hiss;
+  const b = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), d = b.getChannelData(0); let x = 22222;
+  for (let i = 0; i < d.length; i++) { x = (x * 16807) % 2147483647; d[i] = x / 1073741823.5 - 1; }
+  return ac._hiss = b;
+}
+function hiss(ac, out, t, d, v, f1, f2, type = 'bandpass') {       // a breath of air: whooshes, footfalls, rustles
+  const n = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain(); n.buffer = hissBuf(ac); n.loop = true;
+  bp.type = type; bp.Q.value = 1.1; bp.frequency.setValueAtTime(f1, t); bp.frequency.exponentialRampToValueAtTime(f2, t + d);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + d * .35); g.gain.linearRampToValueAtTime(0, t + d);
+  n.connect(bp); bp.connect(g); g.connect(out); n.start(t); n.stop(t + d + .03);
+}
+// the whole story's sound, laid out on the same clock as the drawing (t0 = the moment of "go"):
+// one whoosh as the room flies off, then a soft warm chord outdoors, then a few notes as the words arrive
+// (from: join part-way through, when the sound is switched on mid-story; nothing earlier than that is played)
+function score(ac, out, t0, end = 9.8, from = 0) {
+  const at = s => t0 + s, p0 = Math.max(.9, from);
+  if (from < .15) hiss(ac, out, at(.15), 1.15, .38, 380, 2400);
+  // a little echo around the notes
+  const bus = ac.createGain(), dl = ac.createDelay(.5), fb = ac.createGain(), lp = ac.createBiquadFilter(), wet = ac.createGain();
+  dl.delayTime.value = .14; fb.gain.value = .36; lp.type = 'lowpass'; lp.frequency.value = 2800; wet.gain.value = .45;
+  bus.connect(out); bus.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(wet); wet.connect(out);
+  // a soft, warm chord that comes in with the outdoors and holds
+  const pad = ac.createGain(), pl = ac.createBiquadFilter(); pl.type = 'lowpass'; pl.frequency.value = 1400; pad.connect(pl); pl.connect(out);
+  pad.gain.setValueAtTime(0, at(p0)); pad.gain.linearRampToValueAtTime(.6, at(from > .9 ? p0 + .9 : 3.2)); pad.gain.setValueAtTime(.6, at(end - 1.2)); pad.gain.linearRampToValueAtTime(0, at(end));
+  [[130.81, .05], [196, .04], [261.63, .035], [329.63, .03], [392, .022], [587.33, .012]].forEach(([f, v], i) => [-1, 1].forEach(dt => {
+    const o = ac.createOscillator(), g = ac.createGain(), l = ac.createOscillator(), lg = ac.createGain();
+    o.frequency.value = f * (1 + dt * .0022); g.gain.value = v; l.frequency.value = .07 + i * .023; lg.gain.value = v * .3; l.connect(lg); lg.connect(g.gain);   // each note breathes at its own pace
+    o.connect(g); g.connect(pad); o.start(at(p0)); l.start(at(p0)); o.stop(at(end + .1)); l.stop(at(end + .1));
+  }));
+  // a few notes as the words write themselves, landing on the name
+  const tn = 5.4 + (MSGS[S.msg].length + 1) * .045 + .15;
+  [[5.4, 523.25], [5.62, 659.25], [5.84, 783.99], [tn, 880], [tn + .2, 1046.5], [tn + .4, 1318.51], [tn + .78, 1567.98]].forEach(([s, f]) => { if (s >= from) pluck(ac, bus, at(s), f, .13); });
+  if (tn >= from) pluck(ac, bus, at(tn), 261.63, .1);
+}
+function audio() {            // only ever started from a tap or a key press, as browsers require
+  if (!SND.ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; SND.ctx = new AC(); }
+  if (SND.ctx.state === 'suspended') SND.ctx.resume().catch(() => {});
+  return SND.ctx;
+}
+function hush() { const g = SND.run; if (!g) return; SND.run = null; g.gain.setTargetAtTime(0, SND.ctx.currentTime, .05); setTimeout(() => g.disconnect(), 500); }
+function playStory(from = 0) {
+  hush(); if (!SND.on || from > 58) return;
+  const ac = audio(); if (!ac || ac.state !== 'running') return;
+  const g = ac.createGain(); g.gain.value = 1.3; g.connect(ac.destination); SND.run = g; score(ac, g, ac.currentTime + .03 - from, 60, from);     // on the site the outdoors carries on for a minute
+}
+// one press of a mechanical key: a sharp bright click with a short plastic "clack" as it bottoms out, then a quieter click as it springs back
+function keyBuf(ac) {
+  if (ac._key) return ac._key;
+  const sr = ac.sampleRate, b = ac.createBuffer(1, Math.floor(sr * .16), sr), d = b.getChannelData(0); let x = 4321, lp = 0;
+  const rnd = () => (x = (x * 16807) % 2147483647) / 1073741823.5 - 1;
+  const hit = (at, amp, f1, f2) => { for (let i = 0; i < sr * .06; i++) { const t = i / sr, n = rnd(); lp += (n - lp) * .35;
+    d[Math.floor(at * sr) + i] += amp * ((n - lp) * .9 * Math.exp(-t * 320) + Math.sin(6.2832 * f1 * t) * .5 * Math.exp(-t * 140) + Math.sin(6.2832 * f2 * t) * .35 * Math.exp(-t * 60)); } };
+  hit(0, 1, 1350, 430); hit(.085, .3, 1900, 620);
+  return ac._key = b;
+}
+function keyClick(ac, out, t, k = Math.random()) {       // no two presses quite alike
+  const n = ac.createBufferSource(), g = ac.createGain(); n.buffer = keyBuf(ac); n.playbackRate.value = .93 + k * .14; g.gain.value = .3 * (.85 + ((k * 7) % 1) * .3);
+  n.connect(g); g.connect(out); n.start(t);
+}
+function tick() {             // a key being pressed
+  if (!SND.on) return; const ac = audio(); if (!ac || ac.state !== 'running') return;
+  keyClick(ac, ac.destination, ac.currentTime + .003);
+}
+function setSound(on, quiet) {
+  SND.on = on; const b = $('snd'); b.setAttribute('aria-pressed', on); b.title = on ? 'sound on' : 'sound off';
+  // a speaker: with sound waves when on, crossed out when off
+  b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.500 9.500h4l5-4.500v14l-5-4.500h-4z" fill="currentColor"/>' +
+    (on ? '<path d="M16 9.500c1.300 1.500 1.300 3.500 0 5"/><path d="M18.800 7c2.700 3 2.700 7 0 10"/>' : '<path d="M16.500 9.500l5 5m0-5l-5 5"/>') + '</svg>';
+  try { localStorage.setItem('tg-sound', on ? '1' : '0'); } catch (e) {}
+  if (!on) hush(); else if (!quiet) { const ac = audio(); if (ac) ac.resume().then(() => { if (S.phase === 'story') playStory(performance.now() / 1000 - S.goT); else pluck(ac, ac.destination, ac.currentTime + .01, 783.99, .1); }).catch(() => {}); }     // mid-story: join the sound where the story is
+}
+
 // ───────── controls ─────────
 const nameEl = $('name'), typeBar = $('typeBar'), doneBar = $('doneBar'), sheet = $('sheet'), scrim = $('scrim');
 function setTheme(k, keep = true) {
@@ -717,28 +802,30 @@ nameEl.addEventListener('input', () => {
   const v = nameEl.value.replace(/^\s+/, '').slice(0, 16), now = performance.now() / 1000, old = S.name;
   if (v !== nameEl.value) nameEl.value = v;
   S.births = [...v].map((ch, i) => (i < old.length && old[i] === ch ? S.births[i] : now));
+  if (v !== old) tick();      // typing and deleting both click
   S.name = v;
 });
 function go() {
   if (!S.name.trim()) { nameEl.focus({ preventScroll: true }); return; }
   S.was = S.intro ? 'intro' : S.phase === 'type' ? 'type' : 'plain'; S.intro = false;     // which opening words should fall away
   S.phase = 'story'; S.goT = performance.now() / 1000; S.ended = false; nameEl.blur(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // puts the phone keyboard away
-  doneBar.classList.add('hidden'); $('sceneBar').classList.add('hidden');
-  try { history.replaceState(null, '', shareURL(true)); } catch (e) {}
+  doneBar.classList.add('hidden'); $('sceneBar').classList.add('hidden'); playStory();
 }
 typeBar.addEventListener('submit', e => { e.preventDefault(); go(); });      // Enter (or "go" on a phone keyboard) starts it
 // keep the keys going to the name: tap the picture, or just start typing
 const focusName = () => { if (S.phase === 'type' && !S.intro && sheet.classList.contains('hidden')) nameEl.focus({ preventScroll: true }); };
+const overKey = e => { const x = (e.clientX - V.ox) / V.k, y = (e.clientY - V.oy) / V.k; return S.phase === 'type' && !S.intro && !!S.name.trim() && Math.abs(x - KEY.x) < KEY.w / 2 + 14 && Math.abs(y - KEY.y) < KEY.h / 2 + 14; };
+cv.addEventListener('mousemove', e => { cv.style.cursor = overKey(e) ? 'pointer' : ''; });      // the hand cursor over the drawn key
 cv.addEventListener('click', e => {
   // a tap on the drawn enter/go key starts the story; anywhere else just gives the keys to the name
-  const x = (e.clientX - V.ox) / V.k, y = (e.clientY - V.oy) / V.k;
-  if (S.phase === 'type' && !S.intro && S.name.trim() && Math.abs(x - KEY.x) < KEY.w / 2 + 14 && Math.abs(y - KEY.y) < KEY.h / 2 + 14) go(); else focusName();
+  if (overKey(e)) { cv.style.cursor = ''; go(); } else focusName();
 });
 addEventListener('keydown', e => { if (document.activeElement !== nameEl && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter')) focusName(); });
 function onEnd() { doneBar.classList.remove('hidden'); }
 $('again').onclick = go;
+$('snd').onclick = () => { setSound(!SND.on); if (!TOUCH) focusName(); };
 $('edit').onclick = () => {
-  S.phase = 'type'; doneBar.classList.add('hidden'); $('sceneBar').classList.remove('hidden');
+  S.phase = 'type'; doneBar.classList.add('hidden'); $('sceneBar').classList.remove('hidden'); hush();
   if (S.fromLink) { S.fromLink = false; S.name = ''; }      // a friend who got a link starts their own from a blank name
   const now = performance.now() / 1000; S.births = [...S.name].map(() => now - 9);
   try { history.replaceState(null, '', location.pathname); } catch (e) {}
@@ -777,13 +864,12 @@ function buildPanel() {
     ['a', 'b'].map(k => `<button type="button" class="face${k === S.who ? ' on' : ''}" data-who="${k}" aria-label="${k === 'a' ? 'short' : 'long'} hair"${k === 'a' ? ' style="margin-left:8px"' : ''}>${faceIcon(k)}</button>`).join('');   // who it is: picked by face, no labels
   $('sceneBar').classList.toggle('hidden', S.phase !== 'type' || !!S.intro);    // only while choosing; the end buttons use this spot later
   $('msgs').innerHTML = MSGS.map((m, i) => `<button type="button" class="hd sm${i === S.msg ? ' on' : ''}" data-msg="${i}">${m}</button>`).join('');
-  const after = () => { buildPanel(); syncURL(); if (!TOUCH) focusName(); };
+  const after = () => { buildPanel(); if (!TOUCH) focusName(); };
   document.querySelectorAll('#swatches [data-th]').forEach(b => b.onclick = () => { setTheme(b.dataset.th); after(); });
   document.querySelectorAll('#sceneBar [data-who]').forEach(b => b.onclick = () => { S.who = b.dataset.who; try { localStorage.setItem('tg-who', S.who); } catch (e) {} after(); });
   document.querySelectorAll('#sceneBar [data-scene]').forEach(b => b.onclick = () => { S.scene = b.dataset.scene; try { localStorage.setItem('tg-scene', S.scene); } catch (e) {} after(); });
   document.querySelectorAll('#msgs [data-msg]').forEach(b => b.onclick = () => { S.msg = +b.dataset.msg; try { localStorage.setItem('tg-msg', S.msg); } catch (e) {} after(); });
 }
-function syncURL() { if (S.phase === 'story') { try { history.replaceState(null, '', shareURL(true)); } catch (e) {} } }
 // one menu for both "save" and "share": pick a shape, see it, pick a format
 function mediaSheet(mode) {
   const kinds = mode === 'save' ? ['video', 'gif', 'jpg'] : ['video', 'gif', 'jpg', 'link'];
@@ -819,7 +905,8 @@ async function makeFile(kind) {
     finally { lock(false); }
   }
   lock(true);
-  try { return await makeVideo(p => status(`drawing the video… ${Math.round(p * 100)}%`), S.shape); }
+  const prog = p => status(`drawing the video… ${Math.round(p * 100)}%`);
+  try { try { return await makeVideo(prog, S.shape); } catch (e) { console.error(e); return await makeVideo(prog, S.shape, false); } }     // if the sound trips it up, once more without
   catch (e) { console.error(e); status('video didn’t work in this browser — try Chrome, or use gif'); return null; }
   finally { lock(false); }
 }
@@ -893,7 +980,13 @@ function videoFrame(g, i, v) {
   const tv = i / FPS, dip = Math.max(1 - seg(tv, 0, .3), seg(tv, VDUR - .3, VDUR));
   drawTo(g, v, { st: tv - LEAD, time: tv, live: false, dip, clean: true });
 }
-async function makeVideo(progress, key = 'story') {
+// the story's sound for a saved video, drawn ahead of time on the video's own clock
+const ASR = 44100, ACFG = { codec: 'mp4a.40.2', sampleRate: ASR, numberOfChannels: 2, bitrate: 128000 };
+async function storySound() {
+  const oac = new OfflineAudioContext(2, Math.ceil(VDUR * ASR), ASR), g = oac.createGain(); g.gain.value = 1.3; g.connect(oac.destination);
+  score(oac, g, LEAD, VDUR - LEAD); return oac.startRendering();
+}
+async function makeVideo(progress, key = 'story', sound = true) {
   const v = viewOf(key), c = off(v), g = c.getContext('2d'), N = Math.round(VDUR * FPS), W = v.w, H = v.h;
   if (window.VideoEncoder && window.Mp4Muxer) {
     let codec = null;
@@ -901,7 +994,9 @@ async function makeVideo(progress, key = 'story') {
       try { if ((await VideoEncoder.isConfigSupported({ codec: cd, width: W, height: H, bitrate: 5e6, framerate: FPS })).supported) { codec = cd; break; } } catch (e) {}
     }
     if (codec) {
-      const mux = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: 'avc', width: W, height: H, frameRate: FPS }, fastStart: 'in-memory' });
+      let aud = null;       // the sound goes in when this browser can write it; otherwise the video is silent, as before
+      if (sound) try { if (window.AudioEncoder && window.OfflineAudioContext && (await AudioEncoder.isConfigSupported(ACFG)).supported) aud = await storySound(); } catch (e) {}
+      const mux = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: 'avc', width: W, height: H, frameRate: FPS }, ...(aud ? { audio: { codec: 'aac', numberOfChannels: 2, sampleRate: ASR } } : {}), fastStart: 'in-memory' });
       let err = null;
       const enc = new VideoEncoder({ output: (ch, meta) => mux.addVideoChunk(ch, meta), error: e => { err = e; } });
       enc.configure({ codec, width: W, height: H, bitrate: 5e6, framerate: FPS });
@@ -913,7 +1008,17 @@ async function makeVideo(progress, key = 'story') {
         while (enc.encodeQueueSize > 4) await new Promise(r => setTimeout(r, 2));
         if (i % 6 === 0) { progress(i / N); await new Promise(r => setTimeout(r, 0)); }
       }
-      await enc.flush(); if (err) throw err; mux.finalize();
+      await enc.flush(); if (err) throw err;
+      if (aud) {
+        const ae = new AudioEncoder({ output: (ch, meta) => mux.addAudioChunk(ch, meta), error: e => { err = e; } }); ae.configure(ACFG);
+        const L = aud.getChannelData(0), R = aud.getChannelData(1), STEP = 4096;
+        for (let i = 0; i < L.length; i += STEP) {
+          const n = Math.min(STEP, L.length - i), data = new Float32Array(n * 2); data.set(L.subarray(i, i + n), 0); data.set(R.subarray(i, i + n), n);
+          const ad = new AudioData({ format: 'f32-planar', sampleRate: ASR, numberOfFrames: n, numberOfChannels: 2, timestamp: Math.round(i / ASR * 1e6), data }); ae.encode(ad); ad.close();
+        }
+        await ae.flush(); ae.close(); if (err) throw err;
+      }
+      mux.finalize();
       return { blob: new Blob([mux.target.buffer], { type: 'video/mp4' }), ext: 'mp4' };
     }
   }
@@ -940,6 +1045,8 @@ let th = q.get('th'), m = q.get('m'), sc = q.get('s'), who = q.get('c');
 if (!q.has('n')) try { th = th || localStorage.getItem('tg-theme'); if (m == null) m = localStorage.getItem('tg-msg'); sc = sc || localStorage.getItem('tg-scene'); who = who || localStorage.getItem('tg-who'); } catch (e) {}
 S.scene = sc === 'desk' ? 'desk' : 'bed'; S.who = who === 'b' ? 'b' : 'a';
 setTheme(th || 'retro', !q.has('n')); S.msg = cl(parseInt(m) || 0, 0, MSGS.length - 1); buildPanel(); layout();
+let snd0 = false; try { snd0 = localStorage.getItem('tg-sound') === '1'; } catch (e) {}
+setSound(snd0, true);      // remembered from last time; it starts with the first key or tap
 if (q.has('t')) FREEZE = parseFloat(q.get('t'));             // ?t=5 freezes the story at 5s (for checking)
 if (q.has('ui')) document.querySelectorAll('.bar,#panel').forEach(b => b.classList.add('hidden'));
 const n0 = (q.get('n') || '').trim().slice(0, 16);
