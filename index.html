@@ -853,10 +853,12 @@ function closeSheet() {
 scrim.onclick = closeSheet;
 // colours and wording, always on screen (bottom right on wide screens, bottom on phones)
 function faceIcon(k) {
-  const st = `stroke="${T.ink}" stroke-width="2.4" stroke-linejoin="round"`;
-  return '<svg viewBox="0 0 32 32">' + (k === 'b' ? `<path d="M5 34V16C5 8 10 4 16 4s11 4 11 12v18z" fill="${T.hair}" ${st}/>` : '') +
-    `<circle cx="16" cy="18" r="8.5" fill="${T.skin}" ${st}/>` +
-    (k === 'b' ? `<path d="M7.5 17c0-7 4-10 8.500-10s8.500 3 8.500 10c-3-4-6-5-9-5-3 1-6 2-8 5z" fill="${T.hair}" ${st}/>` : `<path d="M7.500 16c-1-6 3-10 8.500-10 5 0 8.500 3 8.500 7-3-1-6 0-9 0-3 0-5 1-8 3z" fill="${T.hair}" ${st}/>`) + '</svg>';
+  const st = `stroke="${T.ink}" stroke-width="2.2" stroke-linejoin="round"`, body = `<path d="M7 34c0-6 4-8.500 9-8.500s9 2.500 9 8.500z" fill="${T.top}" ${st}/>`, face = `<circle cx="16" cy="16.500" r="7.600" fill="${T.skin}" ${st}/>`;
+  if (k === 'a') return `<svg viewBox="0 0 32 32">${body}${face}<path d="M8.300 15c-.8-5.500 3-9 8-9 4.500 0 7.700 2.800 7.700 6.500-2.800-1-5.500 0-8.200 0-2.800 0-4.800 1-7.500 2.500z" fill="${T.hair}" ${st}/></svg>`;
+  // long hair: it falls behind the shoulders, parted over the forehead, with a clip
+  return `<svg viewBox="0 0 32 32"><path d="M5.500 31V15.500C5.500 8.500 10 4.500 16 4.500s10.500 4 10.500 11V31z" fill="${T.hair}" ${st}/>${body}${face}` +
+    `<path d="M8 17.500c-.3-5.500 2.600-9.500 8.300-10.300-1.200 4.600-4 8.200-8.300 10.300z" fill="${T.hair}" ${st}/><path d="M24 17.500c.3-5.500-2.200-9.300-7.200-10.300 1 4.600 3.400 8.200 7.200 10.300z" fill="${T.hair}" ${st}/>` +
+    `<rect x="19.500" y="9.300" width="4.200" height="2.300" rx="1" fill="${T.accent}" stroke="${T.ink}" stroke-width="1"/></svg>`;
 }
 function buildPanel() {
   $('swatches').innerHTML = Object.entries(THEMES).map(([k, t]) =>
