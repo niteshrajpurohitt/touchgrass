@@ -4,7 +4,7 @@ Type a friend's name. Watch them go outside.
 
 **[touchgrass.niteshrajpurohit.in](https://touchgrass.niteshrajpurohit.in)**
 
-![touch grass.](og.png)
+![touch grass, Elon.](demo.gif)
 
 A tiny hand-drawn animation you can send to anyone who has been online too long. Type their name and press Enter. A person puts down their phone, the furniture flies away, they walk outside, the grass grows, and they sit down to smell a flower. Then the words write themselves: *touch grass, Elon.*
 
@@ -36,6 +36,7 @@ Download the repo and open `index.html` in a browser. That's all.
 | --- | --- |
 | `index.html` | The whole site |
 | `og.png` | The preview picture shown when the link is shared |
+| `demo.gif` | The animation shown at the top of this page |
 | `icon.png` | The home-screen icon |
 | `vercel.json` | Security headers for hosting on Vercel |
 
