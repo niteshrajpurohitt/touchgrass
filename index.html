@@ -38,7 +38,7 @@ html,body{margin:0;height:100%;background:var(--page);overflow:hidden;overscroll
   font:inherit;font-weight:700;font-size:18px;line-height:1.1;padding:11px 16px;cursor:pointer;
   transition:transform .1s;touch-action:manipulation;white-space:nowrap}
 .hd:active{transform:scale(.95)}
-.hd.primary{background:var(--accent)}
+.hd.primary{background:var(--accent);color:var(--onaccent,var(--ink))}
 .hd.sm{font-size:15px;padding:8px 13px}
 .face{width:38px;height:38px;border-radius:50%;border:3px solid var(--ink);background:var(--paper);padding:0;cursor:pointer;touch-action:manipulation;overflow:hidden}
 .face svg{display:block;width:100%;height:100%}
@@ -94,10 +94,10 @@ html,body{margin:0;height:100%;background:var(--page);overflow:hidden;overscroll
     <div id="msgs" class="row"></div>
     <div id="sceneBar" class="row"></div>
     <div id="doneBar" class="row hidden">
-      <button class="hd sm" id="again" type="button" aria-label="play again">&#8634;</button>
       <button class="hd sm" id="edit" type="button">new name</button>
-      <button class="hd sm" id="saveBtn" type="button">save</button>
-      <button class="hd sm" id="shareBtn" type="button">share</button>
+      <button class="hd sm" id="again" type="button">replay</button>
+      <button class="hd sm primary" id="saveBtn" type="button">save</button>
+      <button class="hd sm primary" id="shareBtn" type="button">share</button>
     </div>
   </div>
   <div id="scrim" class="hidden"></div>
@@ -794,6 +794,7 @@ function setTheme(k, keep = true) {
   if (!THEMES[k]) k = 'retro'; S.th = k; T = THEMES[k];
   const r = document.documentElement.style;
   r.setProperty('--ink', T.ui || T.ink); r.setProperty('--paper', T.paper); r.setProperty('--accent', T.accent); r.setProperty('--page', T.page);
+  r.setProperty('--onaccent', T.ink);      // words on the accent colour stay dark, even in the night theme
   if (keep) try { localStorage.setItem('tg-theme', k); } catch (e) {}
 }
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); }
@@ -926,7 +927,7 @@ async function shareAs(kind) {
   }
   const r = await makeFile(kind); if (!r) return;
   const file = new File([r.blob], fileName() + '.' + r.ext, { type: r.blob.type });
-  const caption = `${text} make yours: ${SITE}`;      // a picture or video already shows the story, so the caption points to the plain site
+  const caption = `${text}\nmake yours: ${SITE}`;      // a picture or video already shows the story, so the caption points to the plain site
   if (!(navigator.canShare && navigator.canShare({ files: [file] }))) {      // e.g. most desktop browsers: save the file and hand over the link instead
     dl(r.blob, file.name); status((await copyLink(url)) ? 'this browser can’t share files, so it was saved and the link was copied' : 'this browser can’t share files, so it was saved instead');
     return;
@@ -937,7 +938,7 @@ async function shareAs(kind) {
   try { await navigator.share({ files: [file], text: caption }); status(''); }
   catch (e) {
     if (e.name === 'AbortError') { status(''); return; }
-    const st = $('status'); st.innerHTML = '<button type="button" class="hd" id="sendIt">ready, tap to share</button>'; $('sendIt').onclick = send;
+    const st = $('status'); st.innerHTML = `<button type="button" class="hd primary" id="sendIt">${kind} ready, tap to share</button>`; $('sendIt').onclick = send;
   }
 }
 // the gif encoder is only fetched when someone asks for a gif, and only run if it is exactly the file we expect
