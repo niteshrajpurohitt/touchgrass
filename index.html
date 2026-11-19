@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>touchgrass</title>
 <meta name="description" content="Type a name. Send them outside.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect x=%223%22 y=%223%22 width=%2258%22 height=%2258%22 rx=%2215%22 fill=%22%23F2EAD3%22 stroke=%22%2323395B%22 stroke-width=%224%22/%3E%3Cpath d=%22M15 53C15 47 13 42 8 38C15 40 20 46 20 53Z%22 fill=%22%237DB862%22 stroke=%22%2323395B%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M39 53C40 43 45 35 55 30C49 37 46 45 45 53Z%22 fill=%22%237DB862%22 stroke=%22%2323395B%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M21 53C21 41 18 30 10 21C20 26 28 39 29 53Z%22 fill=%22%237DB862%22 stroke=%22%2323395B%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M28 53C27 37 30 21 43 9C38 24 37 38 36 53Z%22 fill=%22%237DB862%22 stroke=%22%2323395B%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M10 54H54%22 fill=%22none%22 stroke=%22%2323395B%22 stroke-width=%223.6%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shantell+Sans:wght@500..800&display=swap" rel="stylesheet">
@@ -25,6 +26,8 @@ html,body{margin:0;height:100%;background:var(--page);overflow:hidden;overscroll
 .hd:active{transform:scale(.95)}
 .hd.primary{background:var(--accent)}
 .hd.sm{font-size:15px;padding:8px 13px}
+.face{width:38px;height:38px;border-radius:50%;border:3px solid var(--ink);background:var(--paper);padding:0;cursor:pointer;touch-action:manipulation;overflow:hidden}
+.face svg{display:block;width:100%;height:100%}
 .hd:disabled{opacity:.5;cursor:default}
 /* the name is typed straight onto the picture; this unseen field only catches the keys (and opens the phone keyboard) */
 #typeBar{position:absolute;left:50%;top:40%;width:1px;height:1px;overflow:hidden;opacity:0}
@@ -341,16 +344,25 @@ function person(pp, time) {
   const fa = arm(P.lu, P.lf); tube(fa, 'farm', ARMW, far(T.top)); shape(ell(fa[2][0], fa[2][1], 14, 14, 9), 'fhand', far(T.skin));
   leg(P.lt, P.ls, 'fleg', far(T.pants));
   leg(P.rt, P.rs, 'nleg', T.pants);
+  const long = S.who === 'b';       // the second character: long hair and a plain top; same body and moves
   // hood + torso
-  const hood = add(add(N, nr, -30), up, -10); shape(ell(hood[0], hood[1], 27, 21, 10), 'hood', T.top);
+  if (!long) { const hood = add(add(N, nr, -30), up, -10); shape(ell(hood[0], hood[1], 27, 21, 10), 'hood', T.top); }
   const c = u => add(Hp, up, (TL + 4) * u), sd = (u, w) => add(c(u), nr, w);
   shape([sd(0, 46), sd(.35, 45), sd(.7, 43), sd(1, 36), c(1.1), sd(1, -36), sd(.7, -45), sd(.35, -47), sd(0, -46), c(-.13)], 'torso', T.top);
   // head
   save(); translate(C[0], C[1]); rotate(ha * D);
-  shape(ell(HR * .98, 6, 12, 10, 9), 'nose', T.skin);
+  if (long) shape(ell(HR * .97, 8, 9, 8, 9), 'nose', T.skin); else shape(ell(HR * .98, 6, 12, 10, 9), 'nose', T.skin);
   shape(ell(0, 0, HR, HR, 18), 'head', T.skin);
-  shape([[-53, 14], [-59, -14], [-45, -48], [-11, -63], [25, -57], [50, -34], [31, -25], [14, -34], [-3, -24], [-22, -17], [-31, 6], [-42, 17]], 'hair', T.hair);
-  shape(ell(-8, 8, 10, 13, 9), 'ear', T.skin, { lw: 5 });
+  if (long) {      // her own head: one wavy sweep of hair from the fringe down over the shoulder, lashes, a soft cheek
+    shape([[58, -22], [51, -42], [26, -61], [-12, -66], [-47, -50], [-61, -14], [-71, 22], [-66, 52], [-79, 82], [-72, 110], [-83, 134], [-62, 146], [-40, 136], [-27, 114], [-33, 88], [-21, 62], [-27, 34], [-14, 10], [-10, -12], [4, -30], [22, -38], [42, -34]], 'hair', T.hair);
+    shape(rect(-24, -36, 22, 11), 'clip', T.accent, { lw: 4 });
+    const shut = mood === 'tired' || mood === 'happy';
+    if (shut) line(mood === 'tired' ? [[36, -6], [45, -3]] : [[36, -2], [45, -6]], 'lash', T.ink, 5, { raw: true });
+    else { const ey = mood === 'wide' ? -8 : -6; line([[31, ey - 6], [40, ey - 12]], 'lash', T.ink, 5, { raw: true }); line([[26, ey - 9], [30, ey - 18]], 'lash2', T.ink, 5, { raw: true }); }
+    if (mood !== 'happy') shape(ell(12, 17, 10, 6, 8), 'blush', T.flower, { stroke: null, a: .32 });
+  }
+  else { shape([[-53, 14], [-59, -14], [-45, -48], [-11, -63], [25, -57], [50, -34], [31, -25], [14, -34], [-3, -24], [-22, -17], [-31, 6], [-42, 17]], 'hair', T.hair);
+    shape(ell(-8, 8, 10, 13, 9), 'ear', T.skin, { lw: 5 }); }
   if (mood === 'tired') { line([[16, -6], [26, -2], [36, -6]], 'eye', T.ink, 6, { raw: true }); line([[18, 7], [26, 10], [34, 7]], 'bag', T.ink, 4, { a: .55, raw: true }); line([[22, 29], [40, 28]], 'mouth', T.ink, 5, { raw: true }); }
   else if (mood === 'wide') { shape(ell(26, -8, 8, 10, 9), 'eye', T.ink, { stroke: null }); line([[14, -29], [36, -32]], 'brow', T.ink, 5, { raw: true }); shape(ell(33, 28, 6, 8, 8), 'mouth', T.ink, { stroke: null }); }
   else if (mood === 'open') { shape(ell(26, -6, 6.5, 7.5, 9), 'eye', T.ink, { stroke: null }); line([[20, 24], [30, 30], [42, 24]], 'mouth', T.ink, 5, { raw: true }); }
@@ -584,8 +596,7 @@ const BLANK = 822, KEY = { x: 540, y: BLANK + 84, w: 400, h: 80 };
 function enterKey(time) {
   save(); translate(KEY.x, KEY.y); scale(1 + .05 * Math.sin(time * 5.5));
   shape(rect(-KEY.w / 2, -KEY.h / 2, KEY.w, KEY.h), 'key', T.accent);
-  if (TOUCH) { label('go', -30, 15, 46, 1, T.ink); line([[56, -16], [56, 6], [20, 6]], 'ka', T.ink, 7, { raw: true, sharp: true }); line([[32, -6], [20, 6], [32, 18]], 'kb', T.ink, 7, { raw: true, sharp: true }); }
-  else { label('press enter', -40, 15, 46, 1, T.ink); line([[164, -16], [164, 6], [128, 6]], 'ka', T.ink, 7, { raw: true, sharp: true }); line([[140, -6], [128, 6], [140, 18]], 'kb', T.ink, 7, { raw: true, sharp: true }); }
+  label(TOUCH ? 'tap to start' : 'press enter', -40, 15, 46, 1, T.ink); line([[164, -16], [164, 6], [128, 6]], 'ka', T.ink, 7, { raw: true, sharp: true }); line([[140, -6], [128, 6], [140, 18]], 'kb', T.ink, 7, { raw: true, sharp: true });
   restore();
 }
 function words(o) {
@@ -594,12 +605,11 @@ function words(o) {
   const s2 = fit(nm || 'their name'), b1 = 600, b2 = b1 + 30 + s2 * .86;
   const nameStyle = { fill: T.accent, stroke: T.ink, lw: Math.max(8, s2 * .075) };
   if (st < .5 && !o.clean) {          // the opening words; left out of saved videos, where the words only arrive at the end
-    // what is on screen before "go": the question (typing), the note to a friend who got a link, or just the name
-    const mode = o.intro || (st >= 0 && o.was === 'intro') ? 'intro' : live || (st >= 0 && o.was === 'type') ? 'type' : 'plain';
+    // what is on screen before "go": the question (typing), or just the name (a friend opening a shared link)
+    const mode = live || (st >= 0 && o.was === 'type') ? 'type' : 'plain';
     const ex = seg(st, 0, .45);
     save(); alpha(1 - ex); translate(0, ein(ex) * 170);
-    if (mode === 'intro') { label('someone thinks', 540, b1 - 122, 72); letters('you need to...', 540, b1, s1, { fill: T.text }, () => 1); }
-    else if (mode === 'type') {
+    if (mode === 'type') {
       // the question, then the name being written (or a muted prompt typing itself), then the key to press
       label('who needs to', 540, b1 - 122, 72);
       letters(MSGS[S.msg] + '?', 540, b1, s1, { fill: T.text }, () => 1);
@@ -736,7 +746,7 @@ $('edit').onclick = () => {
   nameEl.value = S.name; if (!TOUCH) { nameEl.focus({ preventScroll: true }); nameEl.select(); }     // on a phone the keyboard waits for a tap on the picture
 };
 function shareURL(rel) {
-  const q = new URLSearchParams({ n: S.name.trim() }); if (S.msg) q.set('m', S.msg); if (S.th !== 'retro') q.set('th', S.th); if (S.scene === 'desk') q.set('s', 'desk');
+  const q = new URLSearchParams({ n: S.name.trim() }); if (S.msg) q.set('m', S.msg); if (S.th !== 'retro') q.set('th', S.th); if (S.scene === 'desk') q.set('s', 'desk'); if (S.who === 'b') q.set('c', 'b');
   return (rel ? location.pathname : location.origin + location.pathname) + '?' + q;
 }
 const fname = () => 'touchgrass-' + (S.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'you');
@@ -755,14 +765,22 @@ function closeSheet() {
 }
 scrim.onclick = closeSheet;
 // colours and wording, always on screen (bottom right on wide screens, bottom on phones)
+function faceIcon(k) {
+  const st = `stroke="${T.ink}" stroke-width="2.4" stroke-linejoin="round"`;
+  return '<svg viewBox="0 0 32 32">' + (k === 'b' ? `<path d="M5 34V16C5 8 10 4 16 4s11 4 11 12v18z" fill="${T.hair}" ${st}/>` : '') +
+    `<circle cx="16" cy="18" r="8.5" fill="${T.skin}" ${st}/>` +
+    (k === 'b' ? `<path d="M7.5 17c0-7 4-10 8.500-10s8.500 3 8.500 10c-3-4-6-5-9-5-3 1-6 2-8 5z" fill="${T.hair}" ${st}/>` : `<path d="M7.500 16c-1-6 3-10 8.500-10 5 0 8.500 3 8.500 7-3-1-6 0-9 0-3 0-5 1-8 3z" fill="${T.hair}" ${st}/>`) + '</svg>';
+}
 function buildPanel() {
   $('swatches').innerHTML = Object.entries(THEMES).map(([k, t]) =>
     `<button type="button" class="dot${k === S.th ? ' on' : ''}" data-th="${k}" title="${t.label}" aria-label="${t.label} colours" style="background:linear-gradient(135deg,${t.sky} 50%,${t.accent} 50%);border-color:${t.ink}"></button>`).join('');
-  $('sceneBar').innerHTML = [['bed', 'in bed'], ['desk', 'at desk']].map(([k, t]) => `<button type="button" class="hd sm${k === S.scene ? ' on' : ''}" data-scene="${k}">${t}</button>`).join('');   // where the story starts
+  $('sceneBar').innerHTML = [['bed', 'in bed'], ['desk', 'at desk']].map(([k, t]) => `<button type="button" class="hd sm${k === S.scene ? ' on' : ''}" data-scene="${k}">${t}</button>`).join('') +   // where the story starts
+    ['a', 'b'].map(k => `<button type="button" class="face${k === S.who ? ' on' : ''}" data-who="${k}" aria-label="${k === 'a' ? 'short' : 'long'} hair"${k === 'a' ? ' style="margin-left:8px"' : ''}>${faceIcon(k)}</button>`).join('');   // who it is: picked by face, no labels
   $('sceneBar').classList.toggle('hidden', S.phase !== 'type' || !!S.intro);    // only while choosing; the end buttons use this spot later
   $('msgs').innerHTML = MSGS.map((m, i) => `<button type="button" class="hd sm${i === S.msg ? ' on' : ''}" data-msg="${i}">${m}</button>`).join('');
   const after = () => { buildPanel(); syncURL(); if (!TOUCH) focusName(); };
   document.querySelectorAll('#swatches [data-th]').forEach(b => b.onclick = () => { setTheme(b.dataset.th); after(); });
+  document.querySelectorAll('#sceneBar [data-who]').forEach(b => b.onclick = () => { S.who = b.dataset.who; try { localStorage.setItem('tg-who', S.who); } catch (e) {} after(); });
   document.querySelectorAll('#sceneBar [data-scene]').forEach(b => b.onclick = () => { S.scene = b.dataset.scene; try { localStorage.setItem('tg-scene', S.scene); } catch (e) {} after(); });
   document.querySelectorAll('#msgs [data-msg]').forEach(b => b.onclick = () => { S.msg = +b.dataset.msg; try { localStorage.setItem('tg-msg', S.msg); } catch (e) {} after(); });
 }
@@ -880,17 +898,17 @@ async function makeVideo(progress, key = 'story') {
 
 // ───────── start ─────────
 const q = new URLSearchParams(location.search);
-let th = q.get('th'), m = q.get('m'), sc = q.get('s');
+let th = q.get('th'), m = q.get('m'), sc = q.get('s'), who = q.get('c');
 // a shared link shows exactly what the sender picked; otherwise use what this visitor picked last time
-if (!q.has('n')) try { th = th || localStorage.getItem('tg-theme'); if (m == null) m = localStorage.getItem('tg-msg'); sc = sc || localStorage.getItem('tg-scene'); } catch (e) {}
-S.scene = sc === 'desk' ? 'desk' : 'bed';
+if (!q.has('n')) try { th = th || localStorage.getItem('tg-theme'); if (m == null) m = localStorage.getItem('tg-msg'); sc = sc || localStorage.getItem('tg-scene'); who = who || localStorage.getItem('tg-who'); } catch (e) {}
+S.scene = sc === 'desk' ? 'desk' : 'bed'; S.who = who === 'b' ? 'b' : 'a';
 setTheme(th || 'retro'); S.msg = cl(parseInt(m) || 0, 0, MSGS.length - 1); buildPanel(); layout();
 if (q.has('t')) FREEZE = parseFloat(q.get('t'));             // ?t=5 freezes the story at 5s (for checking)
 if (q.has('ui')) document.querySelectorAll('.bar,#panel').forEach(b => b.classList.add('hidden'));
 const n0 = (q.get('n') || '').trim().slice(0, 16);
 if (n0) {        // opened from a shared link: a short note first, then the story plays for that name
   nameEl.value = n0; S.name = n0; S.births = [...n0].map(() => -9);
-  if (FREEZE == null) { S.fromLink = true; S.intro = true; setTimeout(go, 2200); }
+  if (FREEZE == null) { S.fromLink = true; S.intro = true; $('sceneBar').classList.add('hidden'); setTimeout(go, 1000); }
 }
 else if (!TOUCH) setTimeout(() => nameEl.focus({ preventScroll: true }), 80);
 if (document.fonts && document.fonts.load) document.fonts.load(`800 100px ${FONT}`).catch(() => {});
