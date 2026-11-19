@@ -584,7 +584,7 @@ const BLANK = 822, KEY = { x: 540, y: BLANK + 84, w: 400, h: 80 };
 function enterKey(time) {
   save(); translate(KEY.x, KEY.y); scale(1 + .05 * Math.sin(time * 5.5));
   shape(rect(-KEY.w / 2, -KEY.h / 2, KEY.w, KEY.h), 'key', T.accent);
-  if (TOUCH) { label('go', -26, 15, 46, 1, T.ink); line([[14, 2], [58, 2]], 'ka', T.ink, 7, { raw: true }); line([[44, -12], [58, 2], [44, 16]], 'kb', T.ink, 7, { raw: true, sharp: true }); }
+  if (TOUCH) { label('go', -30, 15, 46, 1, T.ink); line([[56, -16], [56, 6], [20, 6]], 'ka', T.ink, 7, { raw: true, sharp: true }); line([[32, -6], [20, 6], [32, 18]], 'kb', T.ink, 7, { raw: true, sharp: true }); }
   else { label('press enter', -40, 15, 46, 1, T.ink); line([[164, -16], [164, 6], [128, 6]], 'ka', T.ink, 7, { raw: true, sharp: true }); line([[140, -6], [128, 6], [140, 18]], 'kb', T.ink, 7, { raw: true, sharp: true }); }
   restore();
 }
@@ -658,19 +658,27 @@ function render(o) {
 // ───────── screen ─────────
 const $ = id => document.getElementById(id);
 const stage = $('stage'), cv = $('cv'), g2 = cv.getContext('2d');
-const V = { k: 1, ox: 0, oy: 0, dpr: 1 };
+const V = { k: 1, ox: 0, oy: 0, dpr: 1 }, FLOOR = 1725;      // FLOOR: the lowest blade of the front grass
 function layout() {
   const cw = innerWidth, ch = innerHeight, phone = cw / ch < .66 || cw < 560;
   V.dpr = Math.min(2.5, devicePixelRatio || 1); cv.width = Math.round(cw * V.dpr); cv.height = Math.round(ch * V.dpr);
   if (phone) {      // the 9:16 picture fills the width; short screens keep the text and the person in view
     V.k = cw / W; const sh = H * V.k;
     V.ox = 0; V.oy = ch >= sh ? (ch - sh) * .25 : cl(ch / 2 - 880 * V.k, ch - sh, 0);
+    // the picture stands on the buttons: the ground and the front grass always end just above the top row, whatever the phone's height
+    const pr = $('panel').getBoundingClientRect(), row = $('msgs').offsetHeight;
+    if (pr.height && row) {
+      const top = pr.bottom - ($('swatches').offsetHeight + row * 2 + 20) - 6;     // three rows, even while one of them is hidden mid-story
+      V.k = Math.min(cw / W, (top - 58) / (FLOOR - 440));                          // short screens: a smaller picture, so the words stay below the title
+      V.ox = (cw - W * V.k) / 2; V.oy = top - FLOOR * V.k;
+    }
   } else {          // wide screens: the picture fills the height and the scenery carries on to both sides
     V.k = ch / 1750; V.ox = (cw - W * V.k) / 2; V.oy = -110 * V.k;
   }
   V.vis = [-V.ox / V.k, (cw - V.ox) / V.k]; V.phone = phone; stage.classList.toggle('phone', phone);
 }
 addEventListener('resize', layout); layout();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
 
 let FREEZE = null, BUSY = false;
 function frame() {
@@ -725,7 +733,7 @@ $('edit').onclick = () => {
   if (S.fromLink) { S.fromLink = false; S.name = ''; }      // a friend who got a link starts their own from a blank name
   const now = performance.now() / 1000; S.births = [...S.name].map(() => now - 9);
   try { history.replaceState(null, '', location.pathname); } catch (e) {}
-  nameEl.value = S.name; nameEl.focus({ preventScroll: true }); nameEl.select();
+  nameEl.value = S.name; if (!TOUCH) { nameEl.focus({ preventScroll: true }); nameEl.select(); }     // on a phone the keyboard waits for a tap on the picture
 };
 function shareURL(rel) {
   const q = new URLSearchParams({ n: S.name.trim() }); if (S.msg) q.set('m', S.msg); if (S.th !== 'retro') q.set('th', S.th); if (S.scene === 'desk') q.set('s', 'desk');
@@ -763,7 +771,7 @@ function syncURL() { if (S.phase === 'story') { try { history.replaceState(null,
 function mediaSheet(mode) {
   const kinds = mode === 'save' ? ['video', 'jpg', 'png', 'svg'] : ['video', 'jpg', 'png', 'link'];
   openSheet('<h3>shape</h3><div class="grid">' + Object.entries(SHAPES).map(([k, v]) => `<button type="button" class="hd sm${k === S.shape ? ' on' : ''}" data-shape="${k}">${v.label}</button>`).join('') +
-    `</div><canvas id="pv"></canvas><h3>${mode} as</h3><div class="grid">` + kinds.map((k, i) => `<button type="button" class="hd${i ? '' : ' primary'}" data-s="${k}">${k}</button>`).join('') + '</div><div id="status"></div>');
+    `</div><canvas id="pv"></canvas><h3>${mode} as</h3><div class="grid">` + kinds.map((k, i) => `<button type="button" class="hd" data-s="${k}">${k}</button>`).join('') + '</div><div id="status"></div>');
   sheet.querySelectorAll('[data-shape]').forEach(b => b.onclick = () => { if (BUSY) return; S.shape = b.dataset.shape; mediaSheet(mode); });
   sheet.querySelectorAll('[data-s]').forEach(b => b.onclick = () => (mode === 'save' ? saveAs : shareAs)(b.dataset.s));
   // small picture of exactly what will be saved or shared
@@ -817,8 +825,12 @@ async function shareAs(kind) {
   }
   const send = async () => { try { await navigator.share({ files: [file], text: text + ' ' + url }); status(''); } catch (e) { if (e.name !== 'AbortError') { dl(r.blob, file.name); status('sharing didn’t open, so it was saved instead'); } } };
   if (kind !== 'video') return send();
-  // a video takes a while to draw, and the share menu only opens straight after a tap, so ask for one more
-  const st = $('status'); st.innerHTML = '<button type="button" class="hd primary" id="sendIt">ready, tap to share</button>'; $('sendIt').onclick = send;
+  // the share menu opens by itself as soon as the video is drawn; only a browser that insists on a fresh tap gets a button to tap
+  try { await navigator.share({ files: [file], text: text + ' ' + url }); status(''); }
+  catch (e) {
+    if (e.name === 'AbortError') { status(''); return; }
+    const st = $('status'); st.innerHTML = '<button type="button" class="hd" id="sendIt">ready, tap to share</button>'; $('sendIt').onclick = send;
+  }
 }
 // the whole story as one loop: 1s at the desk → story → hold → dip back to the start
 const FPS = 30, LEAD = 1, VDUR = LEAD + END + 2.2;
@@ -872,7 +884,7 @@ let th = q.get('th'), m = q.get('m'), sc = q.get('s');
 // a shared link shows exactly what the sender picked; otherwise use what this visitor picked last time
 if (!q.has('n')) try { th = th || localStorage.getItem('tg-theme'); if (m == null) m = localStorage.getItem('tg-msg'); sc = sc || localStorage.getItem('tg-scene'); } catch (e) {}
 S.scene = sc === 'desk' ? 'desk' : 'bed';
-setTheme(th || 'retro'); S.msg = cl(parseInt(m) || 0, 0, MSGS.length - 1); buildPanel();
+setTheme(th || 'retro'); S.msg = cl(parseInt(m) || 0, 0, MSGS.length - 1); buildPanel(); layout();
 if (q.has('t')) FREEZE = parseFloat(q.get('t'));             // ?t=5 freezes the story at 5s (for checking)
 if (q.has('ui')) document.querySelectorAll('.bar,#panel').forEach(b => b.classList.add('hidden'));
 const n0 = (q.get('n') || '').trim().slice(0, 16);
