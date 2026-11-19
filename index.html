@@ -39,11 +39,17 @@ html,body{margin:0;height:100%;background:var(--page);overflow:hidden;overscroll
 #stage:not(.phone) #doneBar,#stage:not(.phone) #sceneBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom))}
 @media (max-width:1480px){#stage:not(.phone) #doneBar,#stage:not(.phone) #sceneBar{bottom:calc(70px + env(safe-area-inset-bottom))}}   /* not enough room beside the right-hand group: one line up */
 @media (max-height:560px){#stage.phone #panel{display:none}}   /* phone keyboard is up: the picture is short, so the controls step aside until it closes */
+/* the end buttons rise in from below, all together */
+@keyframes rise{from{transform:translateY(90px);opacity:0}}
+#doneBar .hd{animation:rise .45s cubic-bezier(.22,1,.36,1) backwards}
 .dot{width:30px;height:30px;border-radius:50%;border:3px solid;padding:0;cursor:pointer;touch-action:manipulation}
 .hidden{display:none!important}
-#scrim{position:absolute;inset:0;background:rgba(0,0,0,.18)}
-#sheet{position:absolute;left:50%;transform:translateX(-50%);width:min(calc(100% - 20px),480px);bottom:calc(10px + env(safe-area-inset-bottom));background:var(--paper);border:3px solid var(--ink);
-  border-radius:22px 26px 20px 28px;padding:16px 16px 18px;max-height:76%;overflow:auto}
+#scrim{position:absolute;inset:0;background:rgba(0,0,0,.18);opacity:0;transition:opacity .3s}
+#scrim.open{opacity:1}
+/* the menu card: sits flush on the bottom edge and slides up from below */
+#sheet{position:absolute;left:50%;transform:translate(-50%,105%);transition:transform .36s cubic-bezier(.22,1,.36,1);width:min(100%,480px);bottom:0;background:var(--paper);border:3px solid var(--ink);border-bottom:0;
+  border-radius:22px 26px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));max-height:80%;overflow:auto}
+#sheet.open{transform:translate(-50%,0)}
 #sheet h3{margin:0 0 10px;font-size:15px;font-weight:700;opacity:.65}
 #sheet h3:not(:first-child){margin-top:18px}
 .grid{display:flex;flex-wrap:wrap;gap:10px}
@@ -114,8 +120,6 @@ let T = THEMES.retro;
 // shapes you can save in: output size, which slice of the scene it shows (top to bot), and where the sun sits in it
 const SHAPES = {
   story: { label: '9:16', w: 1080, h: 1920, top: 0, bot: 1920, sun: [870, 250] },
-  post: { label: '4:5', w: 1080, h: 1350, top: 250, bot: 1790, sun: [1010, 390] },
-  square: { label: '1:1', w: 1080, h: 1080, top: 330, bot: 1790, sun: [1110, 470] },
   wide: { label: '16:9', w: 1920, h: 1080, top: 380, bot: 1790, sun: [1250, 520] }
 };
 function viewOf(key) { const v = SHAPES[key], k = v.h / (v.bot - v.top); return { ...v, key, k, ox: v.w / 2 - 540 * k, oy: -v.top * k, vis: [540 - v.w / 2 / k, 540 + v.w / 2 / k] }; }
@@ -729,8 +733,18 @@ function shareURL(rel) {
 }
 const fname = () => 'touchgrass-' + (S.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'you');
 // sheets
-function openSheet(html) { sheet.innerHTML = '<button id="x" type="button" aria-label="close">&times;</button>' + html; sheet.classList.remove('hidden'); scrim.classList.remove('hidden'); $('x').onclick = closeSheet; }
-function closeSheet() { if (BUSY) return; sheet.classList.add('hidden'); scrim.classList.add('hidden'); }
+let sheetTimer = 0;
+function openSheet(html) {
+  sheet.innerHTML = '<button id="x" type="button" aria-label="close">&times;</button>' + html; $('x').onclick = closeSheet;
+  clearTimeout(sheetTimer); sheet.classList.remove('hidden'); scrim.classList.remove('hidden');
+  void sheet.offsetHeight;                                   // so the slide starts from below even on the first open
+  sheet.classList.add('open'); scrim.classList.add('open');
+}
+function closeSheet() {
+  if (BUSY) return;
+  sheet.classList.remove('open'); scrim.classList.remove('open');
+  clearTimeout(sheetTimer); sheetTimer = setTimeout(() => { sheet.classList.add('hidden'); scrim.classList.add('hidden'); }, 380);   // after it has slid away
+}
 scrim.onclick = closeSheet;
 // colours and wording, always on screen (bottom right on wide screens, bottom on phones)
 function buildPanel() {
@@ -747,7 +761,7 @@ function buildPanel() {
 function syncURL() { if (S.phase === 'story') { try { history.replaceState(null, '', shareURL(true)); } catch (e) {} } }
 // one menu for both "save" and "share": pick a shape, see it, pick a format
 function mediaSheet(mode) {
-  const kinds = mode === 'save' ? ['video', 'png', 'jpg', 'svg'] : ['video', 'png', 'jpg', 'link'];
+  const kinds = mode === 'save' ? ['video', 'jpg', 'png', 'svg'] : ['video', 'jpg', 'png', 'link'];
   openSheet('<h3>shape</h3><div class="grid">' + Object.entries(SHAPES).map(([k, v]) => `<button type="button" class="hd sm${k === S.shape ? ' on' : ''}" data-shape="${k}">${v.label}</button>`).join('') +
     `</div><canvas id="pv"></canvas><h3>${mode} as</h3><div class="grid">` + kinds.map((k, i) => `<button type="button" class="hd${i ? '' : ' primary'}" data-s="${k}">${k}</button>`).join('') + '</div><div id="status"></div>');
   sheet.querySelectorAll('[data-shape]').forEach(b => b.onclick = () => { if (BUSY) return; S.shape = b.dataset.shape; mediaSheet(mode); });
