@@ -36,8 +36,8 @@ html,body{margin:0;height:100%;background:var(--page);overflow:hidden;overscroll
 #stage.phone #panel .row{gap:min(8px,1.8vw);justify-content:center}
 #stage.phone #panel .hd{font-size:clamp(11px,3.7vw,15px);padding:8px clamp(6px,2.6vw,13px)}
 /* wide screens: the end buttons sit bottom centre, so the colours and wording on the right never move when they appear */
-#stage:not(.phone) #doneBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom))}
-@media (max-width:1480px){#stage:not(.phone) #doneBar{bottom:calc(70px + env(safe-area-inset-bottom))}}   /* not enough room beside the right-hand group: one line up */
+#stage:not(.phone) #doneBar,#stage:not(.phone) #sceneBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom))}
+@media (max-width:1480px){#stage:not(.phone) #doneBar,#stage:not(.phone) #sceneBar{bottom:calc(70px + env(safe-area-inset-bottom))}}   /* not enough room beside the right-hand group: one line up */
 @media (max-height:560px){#stage.phone #panel{display:none}}   /* phone keyboard is up: the picture is short, so the controls step aside until it closes */
 .dot{width:30px;height:30px;border-radius:50%;border:3px solid;padding:0;cursor:pointer;touch-action:manipulation}
 .hidden{display:none!important}
@@ -68,6 +68,7 @@ html,body{margin:0;height:100%;background:var(--page);overflow:hidden;overscroll
   <div id="panel">
     <div id="swatches" class="row"></div>
     <div id="msgs" class="row"></div>
+    <div id="sceneBar" class="row"></div>
     <div id="doneBar" class="row hidden">
       <button class="hd sm" id="again" type="button" aria-label="play again">&#8634;</button>
       <button class="hd sm" id="edit" type="button">new name</button>
@@ -263,7 +264,7 @@ function toSVG(v = viewOf('story')) {
 }
 
 // ───────── state ─────────
-const S = { name: '', births: [], msg: 0, th: 'retro', shape: 'story', phase: 'type', goT: 0, ended: false };
+const S = { name: '', births: [], msg: 0, th: 'retro', scene: 'bed', shape: 'story', phase: 'type', goT: 0, ended: false };
 const MX = document.createElement('canvas').getContext('2d');
 
 // ───────── the person ─────────
@@ -274,6 +275,14 @@ const SIT = { x: 345, y: 1318, torso: 20, head: 6, lt: 88, ls: -2, rt: 92, rs: 2
   [SIT.ru, SIT.rf] = ik(sh, [574, 1160], UA, FA); [SIT.lu, SIT.lf] = ik(sh, [550, 1160], UA, FA);
 }
 const UPSIT = { ...SIT, torso: -3, head: -12, ru: 40, rf: 132, lu: 36, lf: 128 };
+// the second opening: lying in bed, propped on a pillow, scrolling on a phone held above the face
+const LIE = { x: 430, y: 1278, torso: -65, head: 25, lt: 128, ls: 52, rt: 90, rs: 88, lu: 0, lf: 0, ru: 0, rf: 0 };
+const PHONE = [350, 1068];
+{ // both hands hold the phone: work the arm angles out from where it is
+  const sh = add([LIE.x, LIE.y], upv(LIE.torso), TL - 20);
+  [LIE.ru, LIE.rf] = ik(sh, [372, 1096], UA, FA); [LIE.lu, LIE.lf] = ik(sh, [358, 1080], UA, FA);
+}
+const UPLIE = { ...LIE, torso: -46, head: 6 };
 const STAND = { x: 345, y: 1202, torso: 0, head: 0, lt: -3, ls: -3, rt: 3, rs: 3, lu: -6, lf: -2, ru: 8, rf: 16 };
 const SITG = { x: 462, y: 1457, torso: 4, head: -4, lt: 118, ls: 62, rt: 125, rs: 55, lu: 2, lf: 91, ru: 24, rf: 70 };   // low enough that the front grass hides where the body meets the ground
 const INGRASS = 25;           // how far the feet sink into the front grass outdoors
@@ -281,10 +290,13 @@ const PICK = [665, 1405];   // where the hand grabs the flower
 
 function poseAt(st, time) {
   let P, mood = 'tired', rk = 0, uk = 0;
+  const bed = S.scene === 'bed', A0 = bed ? LIE : SIT, A1 = bed ? UPLIE : UPSIT;     // how the story opens: in bed or at the desk
   if (st < 0) {
-    P = { ...SIT }; P.rf += 2 + 3 * Math.sin(time * 19); P.lf += 2 + 3 * Math.sin(time * 19 + 2.1); P.head += 1.5 * Math.sin(time * 1.3);
-  } else if (st < .3) { P = lp(SIT, UPSIT, eout(seg(st, 0, .3))); mood = 'wide'; }
-  else if (st < .95) { const k = eio(seg(st, .3, .95)); P = lp(UPSIT, STAND, k); P.torso += Math.sin(k * Math.PI) * 24; mood = 'wide'; }
+    P = { ...A0 };
+    if (bed) { P.rf += 1.5 * Math.sin(time * 6); P.head += Math.sin(time * 1.3); }                     // thumb scrolling
+    else { P.rf += 2 + 3 * Math.sin(time * 19); P.lf += 2 + 3 * Math.sin(time * 19 + 2.1); P.head += 1.5 * Math.sin(time * 1.3); }   // typing
+  } else if (st < .3) { P = lp(A0, A1, eout(seg(st, 0, .3))); mood = 'wide'; }
+  else if (st < .95) { const k = eio(seg(st, .3, .95)); P = lp(A1, STAND, k); P.torso += Math.sin(k * Math.PI) * 24; mood = 'wide'; }
   else if (st < 1.2) { P = { ...STAND }; mood = 'wide'; }
   else if (st < 2.7) {
     const env = Math.min(seg(st, 1.2, 1.4), 1 - seg(st, 2.5, 2.7)), ph = (st - 1.2) * Math.PI * 2 * 1.35, s = Math.sin(ph), c = Math.cos(ph);
@@ -298,7 +310,7 @@ function poseAt(st, time) {
     const lean = rk * (1 - uk);
     P.torso += 31 * lean + Math.sin(time * 1.2) * 1.3; P.head += 12 * lean - 5 * uk + Math.sin(time * 1.2 + 1) * 1.5 * uk;
   }
-  return { P, mood, rk, uk, held: st >= 5.0 };
+  return { P, mood, rk, uk, held: st >= 5.0, mid: bed && st < .6 ? () => phone(st, time) : null };
 }
 function ik(S0, Tg, L1, L2) {
   const dx = Tg[0] - S0[0], dy = Tg[1] - S0[1];
@@ -349,6 +361,7 @@ function person(pp, time) {
     const [u, f] = ik(Sh, tg, UA, FA); na = arm(u, f);
   }
   const hand = na[2];
+  if (pp.mid) pp.mid();      // something held between the two hands (the phone)
   if (held) { line([[hand[0] + 3, hand[1] + 30], [hand[0], hand[1]], [hand[0] - 2, hand[1] - 40]], 'hstem', T.ink, 6); flowerHead(hand[0] - 2, hand[1] - 42, 1, T.flower, 'hf'); }
   tube(na, 'narm', ARMW, T.top); shape(ell(hand[0], hand[1], 14, 14, 9), 'nhand', T.skin);
 }
@@ -492,6 +505,35 @@ function desk(st, time) {
   for (let i = 0; i < 2; i++) { const x = 802 + i * 18, p = []; for (let j = 0; j < 5; j++) p.push([x + Math.sin(time * 3 + j * 1.3 + i) * 6, 1126 - j * 13]); line(p, 'steam' + i, T.ink, 4, { a: .45 }); }
   restore();
 }
+// ── the bed scene ──
+function phone(st, time) {        // seen edge-on, lit side towards the face; flies out of the hands on "go"
+  const k = seg(st, .05, .6) ** 2;
+  save(); translate(PHONE[0] + k * 900, PHONE[1] - k * 520); rotate(50 * D + k * 5);
+  shape(rect(-32, -7, 64, 14), 'phone', T.prop2, { lw: 5 });
+  line([[-28, 9], [28, 9]], 'pglow', T.screen, 6, { a: .5 + .5 * Math.abs(Math.sin(time * 9)) });
+  restore();
+}
+function bed(st) {
+  if (seg(st, .75, 1.35) >= 1) return;
+  save(); translate(-inback(seg(st, .75, 1.35)) * 1200, 0);
+  shape(rect(150, 1120, 34, 270), 'bhead', T.prop);
+  shape(rect(818, 1262, 26, 128), 'bfoot', T.prop);
+  shape(rect(176, 1382, 20, 68), 'bleg1', T.prop, { lw: 5 }); shape(rect(806, 1382, 20, 68), 'bleg2', T.prop, { lw: 5 });
+  shape(rect(170, 1358, 664, 30), 'bframe', T.prop);
+  shape(rect(180, 1300, 642, 60), 'bmat', T.paper);
+  shape(ell(256, 1234, 100, 58, 16, -.5), 'pillow', T.cloud);
+  restore();
+}
+function nightstand(st) {
+  if (seg(st, .45, 1.15) >= 1) return;
+  const k = inback(seg(st, .45, 1.15));
+  save(); translate(914 + k * 860, 1380); rotate(k * .28); translate(-914, -1380);
+  line([[914, 1312], [914, 1258]], 'lstem', T.ink, 8, { raw: true });
+  shape(poly([[880, 1262], [948, 1262], [934, 1204], [894, 1204]], 24), 'lshade', T.accent, { lw: 5 });
+  shape(rect(866, 1310, 96, 140), 'nstand', T.prop);
+  line([[896, 1356], [932, 1356]], 'nh', T.ink, 6);
+  restore();
+}
 function butterfly(st, time) {
   const a = seg(st, 4.0, 4.8); if (a <= 0) return;
   const x = 790 + Math.cos(time * .6) * 130, y = 1090 + Math.sin(time * 1.1) * 70 + (1 - eout(a)) * -300, fl = .3 + .7 * Math.abs(Math.sin(time * 13));
@@ -518,17 +560,20 @@ function letters(str, cx, base, size, style, pop) {
 // a plain line of text, centred on x
 function label(str, x, y, size, a = 1, fill = T.text) { save(); alpha(a); translate(x, y); OPS.push({ k: 't', ch: str, m: TF.slice(), size, fill, stroke: null, lw: 0, a: ALPHA }); restore(); }
 // the name spot on the first screen: "type a name" and example names take turns typing themselves, until you type your own
-const ASK = TOUCH ? "tap to type your friend's name" : "type your friend's name";
-const PLACE = ['Elon', 'my boss', 'that one friend', 'my ex', 'me'].flatMap(e => [ASK, e]);
-const placeDur = e => e.length * .13 + (e === ASK ? 2.4 : 1.3) + .3;
+const ASK1 = TOUCH ? "tap to type your friend's name" : "type your friend's name", ASK = TOUCH ? 'tap to type a name' : 'type a name';
+const NAMES = ['Elon', 'my boss', 'that one friend', 'my ex', 'me'];
+const FIRST = NAMES.flatMap((e, i) => [i ? ASK : ASK1, e]), LATER = NAMES.flatMap(e => [ASK, e]);   // the longer prompt shows once, then the short one
+const placeDur = e => e.length * .13 + (e === ASK || e === ASK1 ? 2.4 : 1.3) + .3;
+const total = L => L.reduce((a, e) => a + placeDur(e), 0);
 function example(time) {
-  let t = time % PLACE.reduce((a, e) => a + placeDur(e), 0);
-  for (const e of PLACE) {
+  const first = time < total(FIRST), L = first ? FIRST : LATER;
+  let t = first ? time : (time - total(FIRST)) % total(LATER);
+  for (const e of L) {
     const ty = e.length * .09, hold = placeDur(e) - e.length * .13 - .3;
     if (t < placeDur(e)) return { full: e, n: t < ty ? Math.floor(t / .09) + 1 : t < ty + hold ? e.length : Math.max(0, e.length - Math.floor((t - ty - hold) / .04) - 1) };
     t -= placeDur(e);
   }
-  return { full: PLACE[0], n: 0 };
+  return { full: L[0], n: 0 };
 }
 // where the name is written, and the drawn key that starts the story (press Enter, or click or tap the key)
 const BLANK = 822, KEY = { x: 540, y: BLANK + 84, w: 400, h: 80 };
@@ -593,11 +638,11 @@ function render(o) {
   grass(st, time, 0);
   flowers(st, time);
   sides(st);
-  chair(st);
-  desk(st, time);
+  const inBed = S.scene === 'bed';
+  if (inBed) { bed(st); nightstand(st); } else { chair(st); desk(st, time); }
   person(poseAt(st, time), time);
-  const ga = (1 - seg(st, 0, .4)) * .32;             // laptop light on the face
-  if (ga > 0) shape([[690, 1172], [734, 1052], [478, 1046], [468, 1150]], 'cone', T.screen, { stroke: null, a: ga, sharp: true });
+  const ga = (1 - seg(st, 0, .4)) * .32;             // light from the laptop or the phone on the face
+  if (ga > 0) shape(inBed ? [[329, 1043], [371, 1093], [304, 1153], [246, 1085]] : [[690, 1172], [734, 1052], [478, 1046], [468, 1150]], 'cone', T.screen, { stroke: null, a: ga, sharp: true });
   grass(st, time, 1);
   butterfly(st, time);
   restore();
@@ -657,7 +702,7 @@ function go() {
   if (!S.name.trim()) { nameEl.focus({ preventScroll: true }); return; }
   S.was = S.intro ? 'intro' : S.phase === 'type' ? 'type' : 'plain'; S.intro = false;     // which opening words should fall away
   S.phase = 'story'; S.goT = performance.now() / 1000; S.ended = false; nameEl.blur(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // puts the phone keyboard away
-  doneBar.classList.add('hidden');
+  doneBar.classList.add('hidden'); $('sceneBar').classList.add('hidden');
   try { history.replaceState(null, '', shareURL(true)); } catch (e) {}
 }
 typeBar.addEventListener('submit', e => { e.preventDefault(); go(); });      // Enter (or "go" on a phone keyboard) starts it
@@ -672,14 +717,14 @@ addEventListener('keydown', e => { if (document.activeElement !== nameEl && !e.c
 function onEnd() { doneBar.classList.remove('hidden'); }
 $('again').onclick = go;
 $('edit').onclick = () => {
-  S.phase = 'type'; doneBar.classList.add('hidden');
+  S.phase = 'type'; doneBar.classList.add('hidden'); $('sceneBar').classList.remove('hidden');
   if (S.fromLink) { S.fromLink = false; S.name = ''; }      // a friend who got a link starts their own from a blank name
   const now = performance.now() / 1000; S.births = [...S.name].map(() => now - 9);
   try { history.replaceState(null, '', location.pathname); } catch (e) {}
   nameEl.value = S.name; nameEl.focus({ preventScroll: true }); nameEl.select();
 };
 function shareURL(rel) {
-  const q = new URLSearchParams({ n: S.name.trim() }); if (S.msg) q.set('m', S.msg); if (S.th !== 'retro') q.set('th', S.th);
+  const q = new URLSearchParams({ n: S.name.trim() }); if (S.msg) q.set('m', S.msg); if (S.th !== 'retro') q.set('th', S.th); if (S.scene === 'desk') q.set('s', 'desk');
   return (rel ? location.pathname : location.origin + location.pathname) + '?' + q;
 }
 const fname = () => 'touchgrass-' + (S.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'you');
@@ -691,9 +736,12 @@ scrim.onclick = closeSheet;
 function buildPanel() {
   $('swatches').innerHTML = Object.entries(THEMES).map(([k, t]) =>
     `<button type="button" class="dot${k === S.th ? ' on' : ''}" data-th="${k}" title="${t.label}" aria-label="${t.label} colours" style="background:linear-gradient(135deg,${t.sky} 50%,${t.accent} 50%);border-color:${t.ink}"></button>`).join('');
+  $('sceneBar').innerHTML = [['bed', 'in bed'], ['desk', 'at desk']].map(([k, t]) => `<button type="button" class="hd sm${k === S.scene ? ' on' : ''}" data-scene="${k}">${t}</button>`).join('');   // where the story starts
+  $('sceneBar').classList.toggle('hidden', S.phase !== 'type' || !!S.intro);    // only while choosing; the end buttons use this spot later
   $('msgs').innerHTML = MSGS.map((m, i) => `<button type="button" class="hd sm${i === S.msg ? ' on' : ''}" data-msg="${i}">${m}</button>`).join('');
   const after = () => { buildPanel(); syncURL(); if (!TOUCH) focusName(); };
   document.querySelectorAll('#swatches [data-th]').forEach(b => b.onclick = () => { setTheme(b.dataset.th); after(); });
+  document.querySelectorAll('#sceneBar [data-scene]').forEach(b => b.onclick = () => { S.scene = b.dataset.scene; try { localStorage.setItem('tg-scene', S.scene); } catch (e) {} after(); });
   document.querySelectorAll('#msgs [data-msg]').forEach(b => b.onclick = () => { S.msg = +b.dataset.msg; try { localStorage.setItem('tg-msg', S.msg); } catch (e) {} after(); });
 }
 function syncURL() { if (S.phase === 'story') { try { history.replaceState(null, '', shareURL(true)); } catch (e) {} } }
@@ -806,8 +854,10 @@ async function makeVideo(progress, key = 'story') {
 
 // ───────── start ─────────
 const q = new URLSearchParams(location.search);
-let th = q.get('th'), m = q.get('m');
-try { th = th || localStorage.getItem('tg-theme'); if (m == null) m = localStorage.getItem('tg-msg'); } catch (e) {}
+let th = q.get('th'), m = q.get('m'), sc = q.get('s');
+// a shared link shows exactly what the sender picked; otherwise use what this visitor picked last time
+if (!q.has('n')) try { th = th || localStorage.getItem('tg-theme'); if (m == null) m = localStorage.getItem('tg-msg'); sc = sc || localStorage.getItem('tg-scene'); } catch (e) {}
+S.scene = sc === 'desk' ? 'desk' : 'bed';
 setTheme(th || 'retro'); S.msg = cl(parseInt(m) || 0, 0, MSGS.length - 1); buildPanel();
 if (q.has('t')) FREEZE = parseFloat(q.get('t'));             // ?t=5 freezes the story at 5s (for checking)
 if (q.has('ui')) document.querySelectorAll('.bar,#panel').forEach(b => b.classList.add('hidden'));
